@@ -116,7 +116,30 @@ async def main():
     
     # Get guild IDs - handle more robustly
     guild_ids_str = os.getenv('GUILD_IDS', '')
-    guild_ids = [int(id.strip()) for id in guild_ids_str.split(',') if id.strip()]
+    guild_ids = []
+    
+    # Log the raw value for debugging
+    logger.info(f"Raw GUILD_IDS from .env: '{guild_ids_str}'")
+    
+    # Handle different potential formats
+    if guild_ids_str:
+        if ',' in guild_ids_str:
+            # Handle comma-separated list
+            for id_str in guild_ids_str.split(','):
+                if id_str.strip():
+                    try:
+                        guild_ids.append(int(id_str.strip()))
+                    except ValueError:
+                        logger.error(f"Invalid guild ID format: {id_str}")
+        else:
+            # Handle single value
+            try:
+                if guild_ids_str.strip():
+                    guild_ids.append(int(guild_ids_str.strip()))
+            except ValueError:
+                logger.error(f"Invalid guild ID format: {guild_ids_str}")
+    
+    logger.info(f"Parsed GUILD_IDS: {guild_ids}")
     
     # Create bot instance with necessary intents
     intents = discord.Intents.default()

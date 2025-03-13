@@ -206,25 +206,38 @@ The Pinger module monitors mentions in Discord messages (@everyone, @here, and r
 - Sends notifications with embed messages to a designated channel
 - Whitelist system ensures only authorized users can trigger notifications
 - Jump button allows quick navigation to the original message
-- Fully configurable through environment variables
+- Fully configurable through environment variables or the `/pinger-config` command
 
 ### Configuration
 
-Configure the Pinger module in your `.env` file:
+You can configure the Pinger module in two ways:
 
-```env
-# Pinger Feature Settings
-# Channel ID where ping notifications will be sent
-PINGER_NOTIFICATION_CHANNEL_ID=969208183799296030
-# Comma-separated list of role IDs that CAN trigger notifications
-PINGER_WHITELIST_ROLE_IDS=811975979492704337,811975812596498482
-# Whether to monitor @everyone pings
-PINGER_MONITOR_EVERYONE=True
-# Whether to monitor @here pings
-PINGER_MONITOR_HERE=True
-# Whether to monitor role pings
-PINGER_MONITOR_ROLES=True
-```
+1. **Using the `/pinger-config` command** (recommended):
+   - `/pinger-config` - Shows current configuration
+   - `/pinger-config channel #channel-name` - Sets the notification channel
+   - `/pinger-config whitelist add @role` - Adds a role to the whitelist
+   - `/pinger-config whitelist remove @role` - Removes a role from the whitelist
+   - `/pinger-config whitelist clear` - Clears the entire whitelist
+   - `/pinger-config everyone true|false` - Enables/disables @everyone monitoring
+   - `/pinger-config here true|false` - Enables/disables @here monitoring
+   - `/pinger-config roles true|false` - Enables/disables role mention monitoring
+
+   *Note: All changes made via the command will persist in the .env file*
+
+2. **Directly in your `.env` file**:
+   ```env
+   # Pinger Feature Settings
+   # Channel ID where ping notifications will be sent
+   PINGER_NOTIFICATION_CHANNEL_ID=969208183799296030
+   # Comma-separated list of role IDs that CAN trigger notifications
+   PINGER_WHITELIST_ROLE_IDS=811975979492704337,811975812596498482
+   # Whether to monitor @everyone pings
+   PINGER_MONITOR_EVERYONE=True
+   # Whether to monitor @here pings
+   PINGER_MONITOR_HERE=True
+   # Whether to monitor role pings
+   PINGER_MONITOR_ROLES=True
+   ```
 
 ### Embed Customization
 
