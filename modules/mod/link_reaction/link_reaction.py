@@ -87,10 +87,19 @@ async def process_message(message):
         # Log more details about the message content
         if message.embeds:
             logger.info(f"Message in {message.channel.name} contains {len(message.embeds)} embeds")
+            
+            # Check if message contains embeds from supported stores
+            has_supported_store_embed = False
+            
             for i, embed in enumerate(message.embeds):
                 logger.info(f"Embed #{i+1} in message from {message.author}:")
                 # Log the raw embed data as dictionary
                 logger.info(f"Raw embed data: {embed.to_dict()}")
+                
+                # Check if this is from a supported store
+                if embed.author and embed.author.name == "LUISAVIAROMA":
+                    logger.info(f"Found supported store embed: LUISAVIAROMA")
+                    has_supported_store_embed = True
                 
                 if embed.title:
                     logger.info(f"  - Title: {embed.title}")
@@ -117,8 +126,13 @@ async def process_message(message):
                 logger.info(f"  - Size: {attachment.size} bytes | URL: {attachment.url}")
                 logger.info(f"  - Dimensions: {attachment.width}x{attachment.height}" if hasattr(attachment, 'width') and attachment.width else "  - No dimensions available")
         
-        # For webhook/app messages or whitelisted users:
-        logger.debug(f"Adding link reaction to message in category {message.channel.category}")
+        # Only add link reaction if the message contains embeds from supported stores
+        if not message.embeds or not has_supported_store_embed:
+            logger.debug(f"Skipping link reaction - no embeds from supported stores found")
+            return
+        
+        # For webhook/app messages or whitelisted users with supported store embeds:
+        logger.debug(f"Adding link reaction to message with supported store embed in category {message.channel.category}")
         
         # Check if this message is also in a category that gets the forward reaction
         # If so, wait 3 seconds to make sure the forward reaction is added first
@@ -262,9 +276,39 @@ async def handle_reaction_add(reaction, user):
                     
                     if lv_file_path:
                         try:
+                            # Check if file exists and if PID is already in the file
+                            existing_pids = set()
+                            needs_newline = False
+                            file_empty = True
+                            
+                            if os.path.exists(lv_file_path) and os.path.getsize(lv_file_path) > 0:
+                                with open(lv_file_path, "r") as f:
+                                    # Read all existing PIDs
+                                    existing_content = f.read()
+                                    existing_pids = {line.strip() for line in existing_content.splitlines() if line.strip()}
+                                    
+                                    # Check if file ends with newline
+                                    needs_newline = not existing_content.endswith('\n')
+                                    file_empty = not existing_content.strip()
+                                    
+                                    logger.debug(f"Found {len(existing_pids)} existing PIDs in file")
+                            
+                            # Check if PID already exists in the file
+                            if pid_value in existing_pids:
+                                logger.info(f"PID {pid_value} already exists in file, skipping")
+                                await message.channel.send(f"ℹ️ Product ID `{pid_value}` already exists in LUISAVIAROMA tracking list.")
+                                return
+                            
                             # Append the PID to the file
                             with open(lv_file_path, "a") as f:
-                                f.write(f"{pid_value}\n")
+                                if needs_newline:
+                                    f.write(f"\n{pid_value}\n")
+                                    logger.info(f"Added newline before writing PID")
+                                elif file_empty:
+                                    f.write(f"{pid_value}\n")
+                                else:
+                                    f.write(f"{pid_value}\n")
+                            
                             logger.info(f"Successfully added PID {pid_value} to {lv_file_path}")
                             
                             # Send confirmation response
