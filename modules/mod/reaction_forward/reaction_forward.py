@@ -73,6 +73,61 @@ async def process_message(message):
             
             logger.debug(f"User {message.author} has whitelisted role, processing message")
         
+        # Log detailed information about the incoming message
+        logger.info(f"Processing new message in whitelisted category from {message.author} in {message.channel.name}")
+        logger.info(f"Full message content: {message.content}")
+        logger.info(f"Message ID: {message.id} | Channel: {message.channel.name} | Category: {message.channel.category.name}")
+        
+        # Log additional message metadata
+        if message.webhook_id:
+            logger.info(f"Message is from webhook with ID: {message.webhook_id}")
+        elif message.application_id:
+            logger.info(f"Message is from application with ID: {message.application_id}")
+        
+        # Log message reference if it exists (for replies)
+        if message.reference:
+            logger.info(f"Message is a reply to message ID: {message.reference.message_id}")
+        
+        # Get message data as dict for debugging
+        message_data = {
+            'id': message.id,
+            'content_length': len(message.content),
+            'author': str(message.author),
+            'channel': str(message.channel),
+            'created_at': str(message.created_at),
+            'embeds_count': len(message.embeds),
+            'attachments_count': len(message.attachments),
+            'reference': str(message.reference) if message.reference else None,
+        }
+        logger.info(f"Message metadata: {message_data}")
+        
+        # Log raw message data for debugging
+        try:
+            # Log embed information if present
+            if message.embeds:
+                logger.info(f"Incoming message contains {len(message.embeds)} embeds")
+                for i, embed in enumerate(message.embeds):
+                    logger.info(f"Incoming embed #{i+1} details:")
+                    embed_dict = embed.to_dict()
+                    logger.info(f"Embed raw data: {embed_dict}")
+                    
+                    if embed.title:
+                        logger.info(f"  - Title: {embed.title}")
+                    if embed.description:
+                        logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
+                    if embed.fields:
+                        logger.info(f"  - Fields: {len(embed.fields)}")
+                        for j, field in enumerate(embed.fields):
+                            logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+            
+            # Log attachment information if present
+            if message.attachments:
+                logger.info(f"Incoming message contains {len(message.attachments)} attachments")
+                for i, attachment in enumerate(message.attachments):
+                    logger.info(f"Attachment #{i+1}: {attachment.filename} ({attachment.size} bytes, {attachment.content_type})")
+        except Exception as e:
+            logger.error(f"Error logging incoming message data: {str(e)}")
+        
         # For webhook/app messages or whitelisted users:
         logger.debug(f"Adding forward reaction to message in category {message.channel.category}")
         try:
@@ -119,6 +174,53 @@ async def handle_reaction_add(reaction, user):
     # Check if the reaction is the forward emoji
     if str(reaction.emoji) != config.FORWARD_EMOJI:
         return
+    
+    # Log detailed information about the message being forwarded
+    logger.info(f"Forward reaction added by {user} to message from {message.author} in {message.channel.name}")
+    logger.info(f"Message content: {message.content[:100]}{'...' if len(message.content) > 100 else ''}")
+    
+    # Log raw message data for debugging
+    try:
+        # Get message data as dict for debugging
+        message_data = {
+            'id': message.id,
+            'content': message.content[:200] + ('...' if len(message.content) > 200 else ''),
+            'author': str(message.author),
+            'channel': str(message.channel),
+            'created_at': str(message.created_at),
+            'embeds_count': len(message.embeds),
+            'attachments_count': len(message.attachments),
+            'reference': str(message.reference) if message.reference else None,
+        }
+        logger.info(f"Message data: {message_data}")
+        
+        # Log embed raw data
+        if message.embeds:
+            logger.info(f"Message contains {len(message.embeds)} embeds to be forwarded")
+            for i, embed in enumerate(message.embeds):
+                embed_dict = embed.to_dict()
+                logger.info(f"Raw embed #{i+1} data: {embed_dict}")
+                
+                # Log specific embed components in a more readable format
+                logger.info(f"Embed #{i+1} components:")
+                if embed.title:
+                    logger.info(f"  - Title: {embed.title}")
+                if embed.description:
+                    logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
+                if embed.fields:
+                    for j, field in enumerate(embed.fields):
+                        logger.info(f"  - Field #{j+1}: '{field.name}' = '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+                if embed.footer:
+                    logger.info(f"  - Footer: {embed.footer.text}")
+                if embed.author:
+                    logger.info(f"  - Author: {embed.author.name}")
+                    logger.info(f"    - Author icon: {embed.author.icon_url}")
+                if embed.image:
+                    logger.info(f"  - Image URL: {embed.image.url}")
+                if embed.thumbnail:
+                    logger.info(f"  - Thumbnail URL: {embed.thumbnail.url}")
+    except Exception as e:
+        logger.error(f"Error logging message data: {str(e)}")
     
     # Check if the user has a whitelisted role
     if config.WHITELIST_ROLE_IDS:
@@ -172,6 +274,38 @@ async def handle_reaction_add(reaction, user):
         else:
             forward_username = f"{message.author.display_name} (Forwarded message)"
         
+        # Log detailed information about embeds if present
+        if message.embeds:
+            logger.info(f"Message contains {len(message.embeds)} embeds to forward")
+            for i, embed in enumerate(message.embeds):
+                logger.info(f"Embed #{i+1} details:")
+                if embed.title:
+                    logger.info(f"  - Title: {embed.title}")
+                if embed.description:
+                    logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
+                if embed.fields:
+                    logger.info(f"  - Fields: {len(embed.fields)}")
+                    for j, field in enumerate(embed.fields):
+                        logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+                if embed.footer:
+                    logger.info(f"  - Footer: {embed.footer.text if embed.footer.text else 'No text'}")
+                if embed.author:
+                    logger.info(f"  - Author: {embed.author.name if embed.author.name else 'No name'}")
+                if embed.image:
+                    logger.info(f"  - Has image: {embed.image.url if embed.image.url else 'No URL'}")
+                if embed.thumbnail:
+                    logger.info(f"  - Has thumbnail: {embed.thumbnail.url if embed.thumbnail.url else 'No URL'}")
+                logger.info(f"  - Color: {embed.color}")
+                logger.info(f"  - Timestamp: {embed.timestamp}")
+                logger.info(f"  - URL: {embed.url}")
+        
+        # Log attachments information
+        if message.attachments:
+            logger.info(f"Message contains {len(message.attachments)} attachments to forward")
+            for i, attachment in enumerate(message.attachments):
+                logger.info(f"Attachment #{i+1}: {attachment.filename} ({attachment.size} bytes, {attachment.content_type})")
+        
+        # Send the message
         await webhook.send(
             content=message.content,
             username=forward_username,
@@ -296,8 +430,25 @@ async def handle_reaction_add(reaction, user):
             
             # Forward embeds if any
             if message.embeds:
-                for embed in message.embeds:
+                logger.info(f"Attempting to forward {len(message.embeds)} embeds using fallback method")
+                for i, embed in enumerate(message.embeds):
+                    # Log detailed embed structure for debugging
+                    logger.info(f"Fallback embed #{i+1} structure:")
+                    embed_dict = embed.to_dict()
+                    logger.info(f"Embed as dict: {embed_dict}")
+                    
+                    # Log each component of the embed
+                    if embed.title:
+                        logger.info(f"  - Title: {embed.title}")
+                    if embed.description:
+                        logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
+                    if embed.fields:
+                        logger.info(f"  - Fields: {len(embed.fields)}")
+                        for j, field in enumerate(embed.fields):
+                            logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+                    
                     await notification_channel.send(embed=embed)
+                    logger.info(f"Successfully forwarded embed #{i+1}")
             
             logger.info(f"Used fallback method to forward message from {message.author}")
         except Exception as fallback_error:
@@ -319,16 +470,16 @@ def setup_reaction_forward(bot):
     logger.info(f"Blacklisted channels: {config.BLACKLIST_CHANNEL_IDS}")
     logger.info(f"Using notification channel ID: {pinger_config.NOTIFICATION_CHANNEL_ID}")
     
-    @bot.event
-    async def on_message(message):
+    # Use listen instead of event to avoid overriding other handlers
+    @bot.listen('on_message')
+    async def on_message_reaction_forward(message):
         # Process the message for the reaction_forward feature
         await process_message(message)
         
-        # Make sure to call the bot's process_commands method
-        # This ensures that other command processing still works
-        await bot.process_commands(message)
+        # No need to call bot.process_commands() here - the main handler will do that
     
-    @bot.event
-    async def on_reaction_add(reaction, user):
+    # Use listen instead of event to avoid overriding other handlers
+    @bot.listen('on_reaction_add')
+    async def on_reaction_add_reaction_forward(reaction, user):
         # Process the reaction for forwarding messages
         await handle_reaction_add(reaction, user) 

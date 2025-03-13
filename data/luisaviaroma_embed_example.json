@@ -1,0 +1,34 @@
+{
+  "title": "LUISAVIAROMA Product",
+  "description": "Example product from LUISAVIAROMA",
+  "author": {
+    "name": "LUISAVIAROMA",
+    "icon_url": "https://example.com/luisaviaroma-logo.png"
+  },
+  "fields": [
+    {
+      "name": "Brand",
+      "value": "```\nSOME BRAND NAME\n```",
+      "inline": true
+    },
+    {
+      "name": "Product",
+      "value": "```\nSome Product Description\n```",
+      "inline": true
+    },
+    {
+      "name": "PID",
+      "value": "```\n81I-YU0084\n```",
+      "inline": false
+    },
+    {
+      "name": "Price",
+      "value": "```\n€999\n```",
+      "inline": true
+    }
+  ],
+  "footer": {
+    "text": "LUISAVIAROMA Store"
+  },
+  "color": 0
+} 

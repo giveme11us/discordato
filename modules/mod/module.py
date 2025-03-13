@@ -92,6 +92,26 @@ def setup(bot, registered_commands=None):
     else:
         logger.info("Reaction-forward-config command already registered, skipping")
         
+    # Set up the link_reaction feature
+    try:
+        from modules.mod.link_reaction.link_reaction import setup_link_reaction
+        setup_link_reaction(bot)
+        logger.info("Set up link_reaction feature")
+    except Exception as e:
+        logger.warning(f"Could not set up link_reaction feature: {str(e)}")
+        
+    # Register link-reaction-config command if not already registered
+    if 'link-reaction-config' not in registered_commands:
+        try:
+            from modules.mod.link_reaction.config_cmd import link_reaction_config
+            bot.tree.add_command(link_reaction_config)
+            logger.info("Registered link-reaction-config command")
+            registered_commands.add('link-reaction-config')
+        except Exception as e:
+            logger.warning(f"Could not register link-reaction-config command: {str(e)}")
+    else:
+        logger.info("Link-reaction-config command already registered, skipping")
+        
     # Register mod-config command if not already registered
     if 'mod-config' not in registered_commands:
         try:

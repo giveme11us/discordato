@@ -116,6 +116,20 @@ def register_commands(bot):
         await interaction.response.send_message("Reaction forward configuration command registered")
         logger.info(f"Reaction-forward-config command executed by {interaction.user}")
     
+    # Register link-reaction-config command
+    @bot.tree.command(
+        name="link-reaction-config",
+        description="Configure the link reaction feature"
+    )
+    @app_commands.describe(
+        setting="The setting to view or modify (enabled, categories, blacklist)",
+        value="The new value for the setting"
+    )
+    async def link_reaction_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Link reaction configuration command registered")
+        logger.info(f"Link-reaction-config command executed by {interaction.user}")
+    
     # Register mod-config command
     @bot.tree.command(
         name="mod-config",
