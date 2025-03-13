@@ -88,6 +88,20 @@ def register_commands(bot):
         await interaction.response.send_message(f"🎲 Your random number between {min_value} and {max_value} is: **{number}**")
         logger.info(f"Number command executed by {interaction.user}")
     
+    # Register pinger-config command
+    @bot.tree.command(
+        name="pinger-config",
+        description="Configure the pinger feature"
+    )
+    @app_commands.describe(
+        setting="The setting to view or modify (channel, whitelist, everyone, here)",
+        value="The new value for the setting"
+    )
+    async def pinger_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Pinger configuration command registered")
+        logger.info(f"Pinger-config command executed by {interaction.user}")
+    
     logger.info("Registered all commands")
 
 async def main():
@@ -100,9 +114,9 @@ async def main():
         logger.error("No Discord token found. Set DISCORD_BOT_TOKEN in .env file.")
         return
     
-    # Get guild IDs
+    # Get guild IDs - handle more robustly
     guild_ids_str = os.getenv('GUILD_IDS', '')
-    guild_ids = [int(id) for id in guild_ids_str.split(',') if id]
+    guild_ids = [int(id.strip()) for id in guild_ids_str.split(',') if id.strip()]
     
     # Create bot instance with necessary intents
     intents = discord.Intents.default()
@@ -116,12 +130,20 @@ async def main():
     async def on_ready():
         logger.info(f"Bot {bot.user.name} is ready")
         
+        # Log all registered commands
+        cmds = bot.tree.get_commands()
+        logger.info(f"Bot has {len(cmds)} commands registered")
+        for cmd in cmds:
+            logger.info(f"  - Command: {cmd.name}")
+        
         # Sync to specific guilds
         if guild_ids:
             for guild_id in guild_ids:
+                logger.info(f"Syncing commands to guild ID: {guild_id}")
                 await sync_commands(bot, guild_id)
         else:
             # Sync globally
+            logger.info("No guild IDs found, syncing globally")
             await sync_commands(bot)
         
         # Disconnect after syncing

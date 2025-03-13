@@ -8,7 +8,9 @@ import os
 
 # Discord API settings
 COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '/')
-GUILD_IDS = [int(id) for id in os.getenv('GUILD_IDS', '').split(',') if id]
+# Handle GUILD_IDS more robustly to handle potential spacing issues
+guild_ids_str = os.getenv('GUILD_IDS', '')
+GUILD_IDS = [int(id.strip()) for id in guild_ids_str.split(',') if id.strip()]
 
 # Bot settings
 BOT_DESCRIPTION = "A modular Discord bot system"

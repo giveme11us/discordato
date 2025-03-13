@@ -13,6 +13,9 @@ A modular Discord bot system capable of managing multiple functional modules wit
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **Flexible Configuration**: Environment-based configuration for easy deployment
 - **Command Registration System**: Robust system to prevent duplicate command registration
+- **Pinger Notification System**: Monitors @everyone and @here mentions and sends notifications to a dedicated channel
+  - Whitelist system ensures only specific roles can trigger notifications
+  - Configurable notification channel and monitoring settings
 
 ## Project Structure
 
@@ -166,12 +169,21 @@ If you encounter issues with commands not being synced to Discord:
 
 2. Verify your APPLICATION_ID is correctly set in .env file
 
-3. Try manually syncing commands:
+3. Try manually syncing commands with the dedicated script:
    ```
    python register_commands.py
    ```
+   This script directly communicates with Discord's API to register commands.
 
-4. Check the logs for any errors.
+4. If commands still don't appear, try resetting all commands first:
+   ```
+   python reset_commands.py
+   ```
+   This will remove all existing commands, then you can register them again.
+
+5. Check the logs for any errors.
+
+6. Be patient - changes to slash commands can sometimes take up to an hour to propagate in Discord.
 
 ## Testing
 
@@ -184,7 +196,57 @@ pytest
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Pinger Module
 
+The Pinger module monitors mentions in Discord messages (@everyone, @here, and role mentions) and sends notifications to a designated channel. This helps administrators keep track of important mentions across the server.
+
+### Features
+
+- Monitors @everyone, @here, and role mentions
+- Sends notifications with embed messages to a designated channel
+- Whitelist system ensures only authorized users can trigger notifications
+- Jump button allows quick navigation to the original message
+- Fully configurable through environment variables
+
+### Configuration
+
+Configure the Pinger module in your `.env` file:
+
+```env
+# Pinger Feature Settings
+# Channel ID where ping notifications will be sent
+PINGER_NOTIFICATION_CHANNEL_ID=969208183799296030
+# Comma-separated list of role IDs that CAN trigger notifications
+PINGER_WHITELIST_ROLE_IDS=811975979492704337,811975812596498482
+# Whether to monitor @everyone pings
+PINGER_MONITOR_EVERYONE=True
+# Whether to monitor @here pings
+PINGER_MONITOR_HERE=True
+# Whether to monitor role pings
+PINGER_MONITOR_ROLES=True
+```
+
+### Embed Customization
+
+The notification embeds can be customized using the global embed settings:
+
+```env
+# Global Embed Customization Settings
+# Single color for all embeds (hex format without the # symbol)
+EMBED_COLOR=00ff1f
+# Footer settings
+EMBED_FOOTER_TEXT=Discord Bot
+EMBED_FOOTER_ICON_URL=https://example.com/footer-icon.png
+# Thumbnail settings
+EMBED_THUMBNAIL_URL=https://example.com/thumbnail.png
+# General settings
+EMBED_DEFAULT_TITLE=Notification
+EMBED_INCLUDE_TIMESTAMP=True
+```
+
+# Quick Start
+
+```bash
 # Navigate to your project directory
 cd your_project_directory
 
@@ -192,10 +254,14 @@ cd your_project_directory
 python -m venv .venv
 
 # Activate the virtual environment
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Run the bot
+python discord_bot.py
+
 # When done, deactivate the environment
 deactivate
+```

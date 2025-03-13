@@ -40,18 +40,25 @@ def setup(bot, registered_commands=None):
     else:
         logger.info("Ping command already registered, skipping")
     
-    # Register event handlers
-    @bot.event
-    async def on_message(message):
-        # Ignore messages from bots
-        if message.author.bot:
-            return
+    # Set up the pinger feature
+    try:
+        from modules.mod.pinger.pinger import setup_pinger
+        setup_pinger(bot)
+        logger.info("Set up pinger feature")
+    except Exception as e:
+        logger.warning(f"Could not set up pinger feature: {str(e)}")
         
-        # Process commands
-        await bot.process_commands(message)
-        
-        # Log message
-        logger.debug(f"Message from {message.author}: {message.content}")
+    # Register pinger-config command if not already registered
+    if 'pinger-config' not in registered_commands:
+        try:
+            from modules.mod.pinger.config_cmd import setup_config_cmd
+            setup_config_cmd(bot)
+            logger.info("Registered pinger-config command")
+            registered_commands.add('pinger-config')
+        except Exception as e:
+            logger.warning(f"Could not register pinger-config command: {str(e)}")
+    else:
+        logger.info("Pinger-config command already registered, skipping")
 
 def teardown(bot):
     """

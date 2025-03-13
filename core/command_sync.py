@@ -44,11 +44,39 @@ class CommandSync:
                     logger.warning(f"Guild with ID {guild_id} not found")
                     return
                 
-                # Force sync to specific guild
-                synced = await bot.tree.sync(guild=guild)
-                logger.info(f"Synced {len(synced)} commands to guild {guild.name} ({guild_id})")
-                for cmd in synced:
-                    logger.info(f"  - {cmd.name}")
+                # Force a clean sync by first copying and clearing commands
+                # This is a workaround for Discord's API caching issues
+                cmds_copy = bot.tree.get_commands().copy()
+                
+                try:
+                    # Clear all commands from this guild
+                    logger.debug(f"Clearing commands from guild {guild.name} ({guild_id})")
+                    await bot.tree.sync(guild=guild)
+                    
+                    # Re-add commands to the tree
+                    for cmd in cmds_copy:
+                        bot.tree.add_command(cmd, guild=guild)
+                    
+                    # Now sync the commands again
+                    logger.debug(f"Re-syncing commands to guild {guild.name} ({guild_id})")
+                    synced = await bot.tree.sync(guild=guild)
+                    
+                    logger.info(f"Synced {len(synced)} commands to guild {guild.name} ({guild_id})")
+                    for cmd in synced:
+                        logger.info(f"  - {cmd.name}")
+                    
+                    return synced
+                except Exception as e:
+                    logger.error(f"Error during forced sync to guild {guild_id}: {str(e)}")
+                    logger.error(f"Falling back to normal sync")
+                    
+                    # Fall back to normal sync
+                    synced = await bot.tree.sync(guild=guild)
+                    logger.info(f"Synced {len(synced)} commands to guild {guild.name} ({guild_id})")
+                    for cmd in synced:
+                        logger.info(f"  - {cmd.name}")
+                    
+                    return synced
             else:
                 # Force sync globally
                 synced = await bot.tree.sync()
@@ -56,7 +84,7 @@ class CommandSync:
                 for cmd in synced:
                     logger.info(f"  - {cmd.name}")
                 
-            return synced
+                return synced
         except Exception as e:
             logger.error(f"Error syncing commands: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
@@ -88,15 +116,26 @@ class CommandSync:
                     await self._sync_to_guild(bot, dev_guild_id)
                 else:
                     # In production, sync to specified guilds or globally
-                    if settings.GUILD_IDS:
-                        for guild_id_str in settings.GUILD_IDS:
+                    if hasattr(settings, 'GUILD_IDS') and settings.GUILD_IDS:
+                        # Check if GUILD_IDS is a list or a single string (common in environment variables)
+                        if isinstance(settings.GUILD_IDS, list):
+                            guild_ids = settings.GUILD_IDS
+                        else:
+                            # If it's a comma-separated string, split it
+                            guild_ids = [id.strip() for id in str(settings.GUILD_IDS).split(',') if id.strip()]
+                            
+                        logger.debug(f"Found guild IDs to sync to: {guild_ids}")
+                        
+                        for guild_id_str in guild_ids:
                             if guild_id_str:
                                 try:
                                     guild_id = int(guild_id_str)
+                                    logger.debug(f"Syncing to guild ID: {guild_id}")
                                     await self._sync_to_guild(bot, guild_id)
                                 except ValueError:
                                     logger.error(f"Invalid guild ID: {guild_id_str}")
                     else:
+                        logger.debug("No guild IDs found, syncing globally")
                         await self._sync_to_guild(bot)
                 
                 logger.info(f"Command sync completed for {bot_name}")

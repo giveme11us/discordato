@@ -77,4 +77,29 @@ def register_all_commands(bot):
         await interaction.response.send_message(f"🎲 Your random number between {min_value} and {max_value} is: **{number}**")
         logger.debug(f"Number command executed by {interaction.user}")
     
+    # Register pinger-config command
+    @bot.tree.command(
+        name="pinger-config",
+        description="Configure the pinger feature"
+    )
+    @app_commands.describe(
+        setting="The setting to view or modify (channel, whitelist, everyone, here)",
+        value="The new value for the setting"
+    )
+    async def pinger_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+        # Check if user has administrator permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("You need administrator permissions to use this command.", ephemeral=True)
+            return
+            
+        # Delegate to the pinger module
+        try:
+            from modules.mod.pinger.config_cmd import config_command
+            await config_command(interaction, setting, value)
+        except Exception as e:
+            logger.error(f"Error executing pinger-config command: {str(e)}")
+            await interaction.response.send_message("An error occurred while executing the command.", ephemeral=True)
+            
+        logger.debug(f"Pinger-config command executed by {interaction.user}")
+    
     logger.info(f"Registered {len(bot.tree.get_commands())} commands centrally") 
