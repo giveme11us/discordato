@@ -305,6 +305,34 @@ async def handle_reaction_add(reaction, user):
             for i, attachment in enumerate(message.attachments):
                 logger.info(f"Attachment #{i+1}: {attachment.filename} ({attachment.size} bytes, {attachment.content_type})")
         
+        # First option (preferred): Use Discord's native message reference
+        try:
+            # Create a message reference to the original message
+            message_reference = discord.MessageReference(
+                message_id=message.id,
+                channel_id=message.channel.id,
+                guild_id=message.guild.id
+            )
+            
+            # Create a string for the forwarded by info
+            forwarder_info = f"Forwarded by {user.mention} from {message.channel.mention}"
+            
+            # Forward with native reference + informational text
+            forward_msg = await notification_channel.send(
+                content=forwarder_info,
+                reference=message_reference,
+                allowed_mentions=discord.AllowedMentions.none()
+            )
+            
+            logger.info(f"Message from {message.author} forwarded to {notification_channel.name} by {user} using native reference")
+            logger.info(f"Native reference data: message_id={message.id}, channel_id={message.channel.id}, guild_id={message.guild.id}")
+            
+            return
+        except discord.errors.HTTPException as e:
+            # If the native reference fails, log it and fall back to the webhook method
+            logger.warning(f"Native message reference failed: {str(e)}. Falling back to webhook method.")
+        
+        # Fallback to webhook method if native reference fails
         # Send the message
         await webhook.send(
             content=message.content,
@@ -349,7 +377,7 @@ async def handle_reaction_add(reaction, user):
             allowed_mentions=discord.AllowedMentions.none()
         )
         
-        logger.info(f"Message from {message.author} forwarded to {notification_channel.name} by {user}")
+        logger.info(f"Message from {message.author} forwarded to {notification_channel.name} by {user} using webhook method")
     except discord.errors.HTTPException as e:
         logger.error(f"Failed to forward message: {str(e)}")
         

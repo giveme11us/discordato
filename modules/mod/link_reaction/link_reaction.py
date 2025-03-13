@@ -12,6 +12,7 @@ from config import link_reaction_config as config
 from config import pinger_config
 from config import reaction_forward_config as forward_config
 import os
+import re
 
 logger = logging.getLogger('discord_bot.modules.mod.link_reaction')
 
@@ -218,16 +219,42 @@ async def handle_reaction_add(reaction, user):
             if embed.author and embed.author.name == "LUISAVIAROMA":
                 logger.info(f"Found LUISAVIAROMA embed in message")
                 
-                # Look for PID field
+                # Look for URL first
                 pid_value = None
-                for field in embed.fields:
-                    if field.name.upper() == "PID":
-                        # Extract the PID value and clean it
-                        raw_value = field.value
-                        # Remove markdown formatting (```\n...\n```)
-                        pid_value = raw_value.replace("```", "").strip()
-                        logger.info(f"Found PID in LUISAVIAROMA embed: {pid_value}")
-                        break
+                embed_url = embed.url
+                
+                if embed_url and 'luisaviaroma.com' in embed_url:
+                    logger.info(f"Found LUISAVIAROMA URL: {embed_url}")
+                    
+                    # Parse the URL to extract the product ID
+                    # Example URL format: https://www.luisaviaroma.com/en-it/p/sneakers/81I-ZM5016
+                    pattern = r'\/[^\/]+\/([^\/]+)$'  # Match the last segment after the last slash, preceded by another segment
+                    match = re.search(pattern, embed_url)
+                    
+                    if match:
+                        pid_value = match.group(1)
+                        logger.info(f"Extracted product ID from URL: {pid_value}")
+                    else:
+                        # If URL pattern doesn't match, try a simpler approach
+                        url_parts = embed_url.split('/')
+                        if url_parts and len(url_parts) > 1:
+                            potential_pid = url_parts[-1]
+                            # Validate that it looks like a PID (typically has format like 81I-ZM5016)
+                            if '-' in potential_pid and len(potential_pid) > 4:
+                                pid_value = potential_pid
+                                logger.info(f"Extracted product ID using fallback method: {pid_value}")
+                
+                # If URL parsing failed, check for PID field as fallback
+                if not pid_value:
+                    logger.info("URL parsing failed, trying to extract from PID field")
+                    for field in embed.fields:
+                        if field.name.upper() == "PID":
+                            # Extract the PID value and clean it
+                            raw_value = field.value
+                            # Remove markdown formatting (```\n...\n```)
+                            pid_value = raw_value.replace("```", "").strip()
+                            logger.info(f"Found PID in LUISAVIAROMA embed field: {pid_value}")
+                            break
                 
                 if pid_value:
                     # Get the path from environment variable

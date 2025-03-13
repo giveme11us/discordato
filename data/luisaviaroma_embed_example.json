@@ -1,6 +1,7 @@
 {
-  "title": "LUISAVIAROMA Product",
+  "title": "Travis scott zoom field jaxx sneakers - Nike - Men | Luisaviaroma",
   "description": "Example product from LUISAVIAROMA",
+  "url": "https://www.luisaviaroma.com/en-it/p/sneakers/81I-ZM5016",
   "author": {
     "name": "LUISAVIAROMA",
     "icon_url": "https://example.com/luisaviaroma-logo.png"
@@ -8,17 +9,17 @@
   "fields": [
     {
       "name": "Brand",
-      "value": "```\nSOME BRAND NAME\n```",
+      "value": "```\nNIKE\n```",
       "inline": true
     },
     {
       "name": "Product",
-      "value": "```\nSome Product Description\n```",
+      "value": "```\nTravis scott zoom field jaxx sneakers\n```",
       "inline": true
     },
     {
       "name": "PID",
-      "value": "```\n81I-YU0084\n```",
+      "value": "```\n81I-ZM5016\n```",
       "inline": false
     },
     {
