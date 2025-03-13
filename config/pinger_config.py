@@ -5,6 +5,7 @@ This module contains configuration settings for the pinger feature.
 """
 
 import os
+from config import mod_config
 
 # Notification channel ID for sending ping notifications
 # The channel where the bot will send notifications about @everyone and @here pings
@@ -14,8 +15,8 @@ if NOTIFICATION_CHANNEL_ID and NOTIFICATION_CHANNEL_ID.isdigit():
 
 # IMPORTANT: Whitelist of role IDs that CAN trigger notifications
 # ONLY users with these roles can use @everyone and @here to generate notifications
-# Format: comma-separated list of role IDs
-WHITELIST_ROLE_IDS = [int(id) for id in os.getenv('PINGER_WHITELIST_ROLE_IDS', '').split(',') if id]
+# Using the module-wide whitelist from mod_config
+WHITELIST_ROLE_IDS = mod_config.WHITELIST_ROLE_IDS
 
 # Settings for the notification
 NOTIFICATION_TITLE = "IMPORTANT PING"
@@ -26,5 +27,5 @@ MONITOR_EVERYONE = os.getenv('PINGER_MONITOR_EVERYONE', 'True').lower() in ('tru
 # Whether to monitor @here pings
 MONITOR_HERE = os.getenv('PINGER_MONITOR_HERE', 'True').lower() in ('true', '1', 't')
 
-# Whether to monitor role pings (not implemented yet)
+# Whether to monitor role pings
 MONITOR_ROLES = os.getenv('PINGER_MONITOR_ROLES', 'False').lower() in ('true', '1', 't') 

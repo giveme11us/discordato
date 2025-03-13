@@ -102,6 +102,56 @@ def register_commands(bot):
         await interaction.response.send_message("Pinger configuration command registered")
         logger.info(f"Pinger-config command executed by {interaction.user}")
     
+    # Register reaction-forward-config command
+    @bot.tree.command(
+        name="reaction-forward-config",
+        description="Configure the reaction forward feature"
+    )
+    @app_commands.describe(
+        setting="The setting to view or modify (categories, enable, disable, forwarding)",
+        value="The new value for the setting"
+    )
+    async def reaction_forward_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Reaction forward configuration command registered")
+        logger.info(f"Reaction-forward-config command executed by {interaction.user}")
+    
+    # Register mod-config command
+    @bot.tree.command(
+        name="mod-config",
+        description="Configure module-wide settings"
+    )
+    @app_commands.describe(
+        setting="The setting to view or modify (whitelist)",
+        action="The action to perform (add, remove, clear, view)",
+        value="The value for the action (role mention or ID)"
+    )
+    async def mod_config(
+        interaction: discord.Interaction, 
+        setting: str = None, 
+        action: str = None, 
+        value: str = None
+    ):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Module configuration command registered")
+        logger.info(f"Mod-config command executed by {interaction.user}")
+    
+    # Register purge command
+    @bot.tree.command(
+        name="purge",
+        description="Delete a specified number of messages in the current channel"
+    )
+    @app_commands.describe(
+        count="The number of messages to delete (max 100)"
+    )
+    async def purge(
+        interaction: discord.Interaction, 
+        count: int
+    ):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Purge command registered")
+        logger.info(f"Purge command executed by {interaction.user}")
+    
     logger.info("Registered all commands")
 
 async def main():

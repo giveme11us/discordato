@@ -13,9 +13,9 @@ A modular Discord bot system capable of managing multiple functional modules wit
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **Flexible Configuration**: Environment-based configuration for easy deployment
 - **Command Registration System**: Robust system to prevent duplicate command registration
-- **Pinger Notification System**: Monitors @everyone and @here mentions and sends notifications to a dedicated channel
-  - Whitelist system ensures only specific roles can trigger notifications
-  - Configurable notification channel and monitoring settings
+- **Pinger Notification System**: Monitors `@everyone` and `@here` mentions and sends notifications to a dedicated channel. A whitelist system allows specific roles to use mentions without triggering notifications. The notification channel and monitoring settings are configurable.
+- **Reaction Forward System**: Automatically adds a ➡️ reaction to messages in specified category channels. This can be used to visually mark messages for forwarding or to indicate that a message requires attention. The categories to monitor are fully configurable.
+- **Message Forwarding System**: Users with whitelisted roles can forward messages to the notification channel by reacting with ➡️. Forwards all types of messages including regular user messages, webhook messages, and app messages. Uses Discord's official message forwarding feature, preserving the original author's name and avatar while showing who forwarded the message and the message source. Attachments and embeds from the original message are also included.
 
 ## Project Structure
 
