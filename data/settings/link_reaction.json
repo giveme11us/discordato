@@ -5,17 +5,21 @@
   "LINK_EMOJI": "\ud83d\udd17",
   "STORES": [
     {
-      "name": "LuisaViaRoma",
       "enabled": true,
-      "emoji": "\ud83d\uded2",
-      "domains": [
-        "luisaviaroma.com"
-      ],
-      "category_ids": [],
+      "name": "LUISAVIAROMA",
+      "description": "Extract product IDs from LUISAVIAROMA embeds",
       "channel_ids": [
-        844540176025649152,
         941641033559719966
       ],
+      "detection": {
+        "type": "author_name",
+        "value": "LUISAVIAROMA"
+      },
+      "extraction": {
+        "primary": "url",
+        "pattern": "\\/[^\\/]+\\/([^\\/]+)$",
+        "fallback": "field_pid"
+      },
       "file_path": "/Users/ivansposato/Documents/projects/easycopeu/discord/test.txt"
     }
   ]

@@ -119,76 +119,77 @@ async def process_message(message):
             logger.info(f"Message is from webhook with ID: {message.webhook_id}")
         elif message.application_id:
             logger.info(f"Message is from application with ID: {message.application_id}")
+    
+    # Initialize has_supported_store_embed variable
+    has_supported_store_embed = False
+    detected_stores = []
+    
+    # Get active store configurations
+    active_stores = store_manager.get_active_stores()
+    
+    # Check if message contains embeds from supported stores
+    if message.embeds and active_stores:
+        logger.info(f"Message in {message.channel.name} contains {len(message.embeds)} embeds")
         
-        # Check if message contains embeds from supported stores
-        has_supported_store_embed = False
-        detected_stores = []
-        
-        # Get active store configurations
-        active_stores = store_manager.get_active_stores()
-        
-        if message.embeds and active_stores:
-            logger.info(f"Message in {message.channel.name} contains {len(message.embeds)} embeds")
+        for i, embed in enumerate(message.embeds):
+            logger.info(f"Embed #{i+1} in message from {message.author}:")
             
-            for i, embed in enumerate(message.embeds):
-                logger.info(f"Embed #{i+1} in message from {message.author}:")
+            # Check if this embed matches any of our configured stores
+            for store_id, store_config in active_stores.items():
+                # Match based on detection type
+                is_match = False
+                detection = store_config.get("detection", {})
+                detection_type = detection.get("type", "")
+                detection_value = detection.get("value", "")
                 
-                # Check if this embed matches any of our configured stores
-                for store_id, store_config in active_stores.items():
-                    # Match based on detection type
-                    is_match = False
-                    detection = store_config.get("detection", {})
-                    detection_type = detection.get("type", "")
-                    detection_value = detection.get("value", "")
-                    
-                    logger.debug(f"Checking embed against store {store_id} with detection {detection_type}:{detection_value}")
-                    
-                    if detection_type == "author_name":
-                        if embed.author and embed.author.name and detection_value.lower() in embed.author.name.lower():
-                            is_match = True
-                            logger.debug(f"Match on author name: {embed.author.name}")
-                    elif detection_type == "title_contains":
-                        if embed.title and detection_value.lower() in embed.title.lower():
-                            is_match = True
-                            logger.debug(f"Match on title: {embed.title}")
-                    elif detection_type == "url_contains":
-                        if embed.url and detection_value.lower() in embed.url.lower():
-                            is_match = True
-                            logger.debug(f"Match on URL: {embed.url}")
-                    # Check fields for matching content
-                    if not is_match and embed.fields:
-                        for field in embed.fields:
-                            if (field.name and detection_value.lower() in field.name.lower()) or \
-                               (field.value and detection_value.lower() in field.value.lower()):
-                                is_match = True
-                                logger.debug(f"Match on field content: {field.name} / {field.value}")
-                                break
-                    
-                    if is_match:
-                        logger.info(f"Found supported store embed: {store_config.get('name', store_id)}")
-                        has_supported_store_embed = True
-                        detected_stores.append(store_id)
-                        break  # Found a match for this embed
+                logger.debug(f"Checking embed against store {store_id} with detection {detection_type}:{detection_value}")
                 
-                # Log detailed embed information
-                if embed.title:
-                    logger.info(f"  - Title: {embed.title}")
-                if embed.description:
-                    desc_preview = embed.description[:100] + ('...' if len(embed.description) > 100 else '')
-                    logger.info(f"  - Description: {desc_preview}")
-                if embed.fields:
-                    logger.info(f"  - Contains {len(embed.fields)} fields")
-                    for j, field in enumerate(embed.fields):
-                        logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
-                if embed.footer:
-                    logger.info(f"  - Footer: {embed.footer.text if embed.footer.text else 'No text'}")
-                if embed.author:
-                    logger.info(f"  - Author: {embed.author.name if embed.author.name else 'No name'}")
+                if detection_type == "author_name":
+                    if embed.author and embed.author.name and detection_value.lower() in embed.author.name.lower():
+                        is_match = True
+                        logger.debug(f"Match on author name: {embed.author.name}")
+                elif detection_type == "title_contains":
+                    if embed.title and detection_value.lower() in embed.title.lower():
+                        is_match = True
+                        logger.debug(f"Match on title: {embed.title}")
+                elif detection_type == "url_contains":
+                    if embed.url and detection_value.lower() in embed.url.lower():
+                        is_match = True
+                        logger.debug(f"Match on URL: {embed.url}")
+                # Check fields for matching content
+                if not is_match and embed.fields:
+                    for field in embed.fields:
+                        if (field.name and detection_value.lower() in field.name.lower()) or \
+                           (field.value and detection_value.lower() in field.value.lower()):
+                            is_match = True
+                            logger.debug(f"Match on field content: {field.name} / {field.value}")
+                            break
+                
+                if is_match:
+                    logger.info(f"Found supported store embed: {store_config.get('name', store_id)}")
+                    has_supported_store_embed = True
+                    detected_stores.append(store_id)
+                    break  # Found a match for this embed
             
-            # Log which stores were detected
-            if detected_stores:
-                logger.info(f"Detected stores: {', '.join(detected_stores)}")
+            # Log detailed embed information
+            if embed.title:
+                logger.info(f"  - Title: {embed.title}")
+            if embed.description:
+                desc_preview = embed.description[:100] + ('...' if len(embed.description) > 100 else '')
+                logger.info(f"  - Description: {desc_preview}")
+            if embed.fields:
+                logger.info(f"  - Contains {len(embed.fields)} fields")
+                for j, field in enumerate(embed.fields):
+                    logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+            if embed.footer:
+                logger.info(f"  - Footer: {embed.footer.text if embed.footer.text else 'No text'}")
+            if embed.author:
+                logger.info(f"  - Author: {embed.author.name if embed.author.name else 'No name'}")
         
+        # Log which stores were detected
+        if detected_stores:
+            logger.info(f"Detected stores: {', '.join(detected_stores)}")
+    
     # Also check message content for links from monitored domains
     if message.content:
         for store_id, store_config in active_stores.items():
@@ -447,7 +448,8 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
                             # Check if PID already exists in the file
                             if pid_value in existing_pids:
                                 logger.info(f"PID {pid_value} already exists in file, skipping")
-                                await message.channel.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                                # Send DM instead of channel message
+                                await user.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
                                 return
 
                             # Append the PID to the file
@@ -462,17 +464,20 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
 
                             logger.info(f"Successfully added PID {pid_value} to {store_file_path}")
 
-                            # Send confirmation response
-                            await message.channel.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                            # Send confirmation as DM to the user instead of to the channel
+                            await user.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
                 except Exception as e:
                     logger.error(f"Failed to write PID to file: {str(e)}")
-                    await message.channel.send(f"❌ Error saving product ID: {str(e)}")
+                    # Send error as DM
+                    await user.send(f"❌ Error saving product ID: {str(e)}")
             else:
                 logger.error(f"No file path configured for {store_config.get('name', 'LUISAVIAROMA')}")
-                await message.channel.send(f"❌ Error: {store_config.get('name', 'LUISAVIAROMA')} file path not configured.")
+                # Send error as DM
+                await user.send(f"❌ Error: {store_config.get('name', 'LUISAVIAROMA')} file path not configured.")
         else:
             logger.warning(f"No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed")
-            await message.channel.send(f"❌ No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed.")
+            # Send error as DM
+            await user.send(f"❌ No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed.")
 
 def setup_link_reaction(bot):
     """

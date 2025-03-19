@@ -22,7 +22,8 @@ A modular Discord bot system capable of managing multiple functional modules wit
   - **Direct Channel Monitoring**: Configure specific channels to monitor for each store instead of only using categories
   - **Store Product ID Extraction**: When whitelisted users react with the 🔗 link emoji to embeds from specific stores, the bot extracts product IDs and saves them to configured files:
     - **LUISAVIAROMA**: Extracts product IDs from embeds with author "LUISAVIAROMA" and saves them to a configured file, with pattern-based extraction from URLs or embed fields
-  - **Specialized Store Commands**: Added `/luisaviaroma_adder` command for easy configuration of LuisaViaRoma link reactions
+  - **Specialized Store Commands**: Added `/luisaviaroma_adder` and `/luisaviaroma_remover` commands for easy management of LuisaViaRoma product tracking
+  - **Context Menu Integration**: Includes user context menu commands for quick product ID management
 - **Keyword Filter System**: Automatically monitors messages in specified categories for problematic content using regex patterns.
   - **Pattern Detection**: Uses regular expressions to match against potential threats and unwanted content
   - **Configurable Actions**: Each filter can be set to log, notify, or delete matching messages
@@ -342,6 +343,15 @@ The Link Reaction module supports a dictionary-based store configuration system:
 - **Using the `/luisaviaroma_adder` command**:
   - `/luisaviaroma_adder` - Shows current LuisaViaRoma configuration
   - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
+
+- **Using the `/luisaviaroma_remover` command**:
+  - `/luisaviaroma_remover` - Shows current LuisaViaRoma configuration
+  - `/luisaviaroma_remover pid:ABC123` - Removes the specified product ID from the tracking file
+  - `/luisaviaroma_remover channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
+  
+- **Using context menu commands**:
+  - Right-click on a user who posted a product ID and select "Remove PID" - Removes the most recent PID posted by that user
+  - All command responses are sent as direct messages to the user who triggered the action
 
 ## Redeye Module
 

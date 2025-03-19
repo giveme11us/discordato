@@ -40,56 +40,46 @@ class CommandSync:
         # Log the commands registered in the bot's command tree
         @bot.event
         async def on_ready():
-            logger.info(f"Bot {bot.user.name} is ready")
-            
-            # Log all registered commands
-            cmds = bot.tree.get_commands()
-            logger.info(f"Bot has {len(cmds)} registered commands")
-            for cmd in cmds:
-                logger.info(f"  - Registered command: {cmd.name}")
-            
-            # Wait a bit for Discord connections to fully establish
-            logger.info("Waiting 5 seconds for Discord connections to stabilize...")
-            await asyncio.sleep(5)
-            
             try:
-                # Only sync commands globally
-                logger.info("Syncing commands globally")
-                current_retry = 0
+                logger.info(f"Started syncing commands for {bot_name}")
                 
-                while current_retry < MAX_RETRIES:
-                    try:
-                        global_cmds = await bot.tree.sync()
-                        logger.info(f"Successfully synced {len(global_cmds)} commands globally")
-                        break
-                    except discord.HTTPException as e:
-                        if e.status == 429:  # Rate limit hit
-                            current_retry += 1
-                            retry_after = e.retry_after if hasattr(e, 'retry_after') else 60
-                            total_wait = retry_after + RETRY_BUFFER
-                            logger.warning(f"Rate limited. Waiting {total_wait:.2f} seconds before retry {current_retry}/{MAX_RETRIES}...")
-                            
-                            if current_retry < MAX_RETRIES:
-                                await asyncio.sleep(total_wait)
-                                logger.info("Retrying global sync after rate limit wait...")
+                # Log all commands in tree
+                commands = bot.tree.get_commands()
+                logger.info(f"Commands in tree for {bot_name}: {len(commands)}")
+                for cmd in commands:
+                    if isinstance(cmd, app_commands.ContextMenu):
+                        logger.info(f"Context menu command: {cmd.name}, type: {cmd.type.name}")
+                    else:
+                        logger.info(f"Slash command: {cmd.name}")
+                
+                # For development environments, sync to specific guild IDs
+                if is_development():
+                    # Get guild IDs from environment variable
+                    guild_ids = settings.GUILD_IDS
+                    if guild_ids:
+                        for guild_id in guild_ids:
+                            guild = bot.get_guild(guild_id)
+                            if guild:
+                                logger.info(f"Syncing commands for guild: {guild.name} (ID: {guild_id})")
+                                # This will sync all commands including context menu commands
+                                bot.tree.copy_global_to(guild=discord.Object(id=guild_id))
+                                await bot.tree.sync(guild=discord.Object(id=guild_id))
+                                logger.info(f"Successfully synced commands to guild {guild.name}")
                             else:
-                                logger.error("Max retries reached for global sync due to rate limits")
-                        else:
-                            logger.error(f"HTTP Exception during global sync: {e}")
-                            logger.error(f"Error type: {type(e).__name__}")
-                            import traceback
-                            logger.error(f"Exception traceback: {traceback.format_exc()}")
-                            break
-                    except Exception as e:
-                        logger.error(f"Error syncing commands globally: {e}")
-                        logger.error(f"Error type: {type(e).__name__}")
-                        import traceback
-                        logger.error(f"Exception traceback: {traceback.format_exc()}")
-                        break
+                                logger.warning(f"Could not find guild with ID {guild_id}")
                 
-                logger.info(f"Command sync process completed for {bot_name}")
+                # Always sync globally as well (needed for context menu commands too)
+                logger.info("Syncing commands globally")
+                await bot.tree.sync()
+                logger.info("Successfully synced commands globally")
+                
+                # Store the synced commands
+                self.synced_commands[bot_name] = bot.tree.get_commands()
+                
+                logger.info(f"Finished syncing commands for {bot_name}")
             except Exception as e:
-                logger.error(f"Error during command sync for {bot_name}: {str(e)}")
+                logger.error(f"Error syncing commands for {bot_name}: {e}")
+                # Log detailed error information
                 import traceback
                 logger.error(f"Exception traceback: {traceback.format_exc()}")
                 
@@ -1038,6 +1028,196 @@ class CommandSync:
                         response += f"File path: `{displayed_path}`\n"
                     response += f"Detection: {store_config['detection']['type']} - {store_config['detection']['value']}\n"
                     response += f"Emoji: 🔗"
+                    
+                    await interaction.response.send_message(response, ephemeral=True)
+                else:
+                    await interaction.response.send_message("⚠️ Failed to save settings", ephemeral=True)
+            
+            # LuisaViaRoma Remover - Specialized command for removing PIDs from files
+            @bot.tree.command(name="luisaviaroma_remover", description="Remove PIDs from LuisaViaRoma tracking and configure settings")
+            @mod_only()
+            async def luisaviaroma_remover(
+                interaction: discord.Interaction,
+                pid: str = None,
+                channel_ids: str = None,
+                file_path: str = None
+            ):
+                # Import the permission checker
+                from utils.permissions import check_interaction_permissions
+                
+                # Check if the user has permission to use this command
+                if not await check_interaction_permissions(interaction, 'mod'):
+                    return
+                
+                # Import configuration
+                from config import link_reaction_config
+                from config import embed_config
+                # Import the remover functionality
+                from modules.mod.link_reaction.remover import remove_pid_from_file
+                
+                # Get current settings
+                stores = link_reaction_config.settings_manager.get("STORES", {})
+                
+                # LuisaViaRoma store ID (lowercase for consistency)
+                store_id = "luisaviaroma"
+                store_name = "LUISAVIAROMA"
+                
+                # Check if store already exists in configuration
+                existing_store = stores.get(store_id) if isinstance(stores, dict) else None
+                if not existing_store and isinstance(stores, list):
+                    for store in stores:
+                        if isinstance(store, dict) and store.get('name', '').lower() == "luisaviaroma":
+                            existing_store = store
+                            break
+                
+                # If PID provided, try to remove it from the file
+                if pid:
+                    success, message = await remove_pid_from_file(pid, None)
+                    await interaction.response.send_message(message, ephemeral=True)
+                    return
+                
+                # If no parameters provided, show current configuration
+                if not any([channel_ids, file_path]):
+                    embed = discord.Embed(
+                        title="LuisaViaRoma Remover Configuration",
+                        description="Current settings for LuisaViaRoma PID removal",
+                    )
+                    
+                    # Apply styling from embed_config
+                    embed = embed_config.apply_default_styling(embed)
+                    
+                    if existing_store:
+                        # Status field
+                        status = "Enabled" if existing_store.get('enabled', False) else "Disabled"
+                        embed.add_field(
+                            name="Status", 
+                            value=f"**{status}**", 
+                            inline=False
+                        )
+                        
+                        # Monitored Channels
+                        channel_ids = existing_store.get('channel_ids', [])
+                        channel_mentions = []
+                        for channel_id in channel_ids:
+                            channel = discord.utils.get(interaction.guild.channels, id=channel_id)
+                            if channel:
+                                channel_mentions.append(f"#{channel.name} ({channel_id})")
+                            else:
+                                channel_mentions.append(f"Unknown ({channel_id})")
+                        
+                        embed.add_field(
+                            name="Monitored Channels", 
+                            value='\n'.join(channel_mentions) if channel_mentions else "None configured", 
+                            inline=False
+                        )
+                        
+                        # File path
+                        file_path = existing_store.get('file_path')
+                        embed.add_field(
+                            name="File Path", 
+                            value=f"`{file_path}`" if file_path else "Not configured", 
+                            inline=False
+                        )
+                        
+                        # Adding instructions for removing PIDs
+                        embed.add_field(
+                            name="How to Remove PIDs", 
+                            value="Use `/luisaviaroma_remover pid:123456` to remove a specific PID\nor use the context menu by right-clicking on a user and selecting 'Remove PID'", 
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="Status", 
+                            value="**Not Configured**", 
+                            inline=False
+                        )
+                    
+                    # Configuration guide
+                    embed.add_field(
+                        name="How to Configure", 
+                        value="`/luisaviaroma_remover channel_ids:123456789,987654321 file_path:/path/to/urls.txt`", 
+                        inline=False
+                    )
+                    
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                
+                # If parameters provided, update configuration (same logic as luisaviaroma_adder)
+                if channel_ids:
+                    # Process channel IDs
+                    try:
+                        channel_list = [int(ch.strip()) for ch in channel_ids.split(',') if ch.strip().isdigit()]
+                        if not channel_list:
+                            await interaction.response.send_message("⚠️ Invalid channel IDs. Please provide comma-separated numbers.", ephemeral=True)
+                            return
+                    except ValueError:
+                        await interaction.response.send_message("⚠️ Invalid channel ID format. Please use comma-separated numbers.", ephemeral=True)
+                        return
+                else:
+                    # If channels not provided but updating file_path, keep existing channels
+                    channel_list = existing_store.get('channel_ids', []) if existing_store else []
+                
+                # Create or update LuisaViaRoma store configuration
+                store_config = {
+                    'enabled': True,
+                    'name': store_name,
+                    'description': "Extract product IDs from LUISAVIAROMA embeds",
+                    'channel_ids': channel_list,
+                    'detection': {
+                        'type': 'author_name',
+                        'value': 'LUISAVIAROMA'
+                    },
+                    'extraction': {
+                        'primary': 'url',
+                        'pattern': r'\/[^\/]+\/([^\/]+)$',
+                        'fallback': 'field_pid'
+                    }
+                }
+                
+                # Add file path if provided
+                if file_path:
+                    store_config['file_path'] = file_path
+                elif existing_store and 'file_path' in existing_store:
+                    # Keep existing file path if not provided and updating existing config
+                    store_config['file_path'] = existing_store['file_path']
+                
+                # Update the store in the stores dictionary
+                if isinstance(stores, dict):
+                    stores[store_id] = store_config
+                elif isinstance(stores, list):
+                    # If it's a list, find and replace the existing store or append
+                    found = False
+                    for i, store in enumerate(stores):
+                        if isinstance(store, dict) and store.get('name', '').lower() == store_name.lower():
+                            stores[i] = store_config
+                            found = True
+                            break
+                    if not found:
+                        stores.append(store_config)
+                else:
+                    # Initialize as a dictionary if it's neither
+                    stores = {store_id: store_config}
+                
+                # Save settings
+                link_reaction_config.settings_manager.set("STORES", stores)
+                link_reaction_config.settings_manager.set("ENABLED", True)
+                if link_reaction_config.settings_manager.save_settings():
+                    logger.info(f"LuisaViaRoma remover configured by {interaction.user}")
+                    
+                    # Prepare channel mentions for display
+                    channel_mentions = []
+                    for channel_id in channel_list:
+                        channel = interaction.guild.get_channel(channel_id)
+                        if channel:
+                            channel_mentions.append(f"<#{channel_id}>")
+                        else:
+                            channel_mentions.append(f"Unknown ({channel_id})")
+                    
+                    response = f"✅ LuisaViaRoma remover configured successfully!\n\n"
+                    response += f"Monitoring channels: {', '.join(channel_mentions)}\n"
+                    if file_path or (existing_store and 'file_path' in existing_store):
+                        displayed_path = file_path or existing_store.get('file_path')
+                        response += f"File path: `{displayed_path}`\n"
                     
                     await interaction.response.send_message(response, ephemeral=True)
                 else:
