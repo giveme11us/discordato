@@ -6,7 +6,7 @@
 |--------|---------|-------------|----------|
 | **mod** | Keyword Filter | Automatically detects keywords in messages and forwards them to a notification channel | `/keyword-filter-setup` |
 | **mod** | Reaction Forward | Forwards messages to a destination channel when a specific reaction is added | `/reaction-forward-setup` |
-| **mod** | Link Reaction | Automatically adds reactions to messages containing links | `/link-reaction` |
+| **mod** | Link Reaction | Automatically adds reactions to messages containing links from supported stores | `/link-reaction`, `/luisaviaroma_adder` |
 | **mod** | Pinger | Monitors for @ mentions and sends notifications | *No slash commands, automatic* |
 | **instore** | In-store Monitoring | Features related to in-store product monitoring | *Commands not visible in provided code* |
 | **online** | Online Monitoring | Features related to online product monitoring | *Commands not visible in provided code* |
@@ -54,16 +54,66 @@ Configure or display the rules for link reactions by store.
 
 | Parameter | Description | Required |
 |-----------|-------------|----------|
-| `store_name` | Name of the store to configure | Yes |
-| `whitelisted_category_ids` | Comma-separated list of category IDs to monitor for links | Yes |
-| `blacklisted_channel_ids` | Comma-separated list of channel IDs to exclude from monitoring | Yes |
-| `file_path` | Path to the file containing reaction settings | Yes |
+| `store_name` | Name of the store to configure | No |
+| `whitelisted_category_ids` | Comma-separated list of category IDs to monitor for links | No |
+| `blacklisted_channel_ids` | Comma-separated list of channel IDs to exclude from monitoring | No |
+| `file_path` | Path to the file containing reaction settings | No |
 
 **Usage Examples:**
 - `/link-reaction` - Displays all store rules
+- `/link-reaction store_name:Amazon` - Displays rules for a specific store
 - `/link-reaction store_name:Amazon whitelisted_category_ids:123456789,234567890 blacklisted_channel_ids:987654321 file_path:/config/amazon.json`
+
+#### `/luisaviaroma_adder`
+
+Specialized command to configure LuisaViaRoma link reactions with simplified parameters.
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `channel_ids` | Comma-separated list of channel IDs to monitor for LuisaViaRoma links | No |
+| `file_path` | Path to the file where extracted product IDs will be saved | No |
+
+**Usage Examples:**
+- `/luisaviaroma_adder` - Displays current LuisaViaRoma configuration
+- `/luisaviaroma_adder channel_ids:123456789,987654321` - Sets channels to monitor (keeps existing file path)
+- `/luisaviaroma_adder file_path:/path/to/luisaviaroma_ids.txt` - Updates the file path (keeps existing channels)
+- `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/luisaviaroma_ids.txt` - Fully configures both channels and file path
 
 ### Other Features
 
 #### Pinger
 Monitors messages for @ mentions (everyone, here, role mentions) and sends notifications about these mentions to a configured channel. This feature runs automatically and does not require slash commands to operate.
+
+## Store Configuration Format
+
+The Link Reaction system now uses a dictionary-based configuration for stores, with this structure:
+
+```json
+{
+  "store_id": {
+    "enabled": true,
+    "name": "Store Display Name",
+    "description": "Description of what this store configuration does",
+    "channel_ids": [123456789, 987654321],
+    "detection": {
+      "type": "author_name|title_contains|url_contains",
+      "value": "value to match"
+    },
+    "extraction": {
+      "primary": "url|field_name",
+      "pattern": "regex pattern to extract ID",
+      "fallback": "alternative field to check"
+    },
+    "file_path": "/path/to/store_ids.txt"
+  }
+}
+```
+
+**Detection Types:**
+- `author_name`: Checks if embed author name contains the detection value
+- `title_contains`: Checks if embed title contains the detection value
+- `url_contains`: Checks if embed URL contains the detection value
+
+**Extraction Methods:**
+- `url`: Extracts product ID from the URL using the regex pattern
+- `field_name`: Looks for a field with this name to extract the product ID

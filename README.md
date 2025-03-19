@@ -16,9 +16,13 @@ A modular Discord bot system capable of managing multiple functional modules wit
 - **Pinger Notification System**: Monitors `@everyone` and `@here` mentions and sends notifications to a dedicated channel. A whitelist system allows specific roles to use mentions without triggering notifications. The notification channel and monitoring settings are configurable.
 - **Reaction Forward System**: Automatically adds a ➡️ reaction to messages in specified category channels. This can be used to visually mark messages for forwarding or to indicate that a message requires attention. The categories to monitor are fully configurable.
 - **Message Forwarding System**: Users with whitelisted roles can forward messages to the notification channel by reacting with ➡️. Forwards all types of messages including regular user messages, webhook messages, and app messages. Uses Discord's official message forwarding feature, preserving the original author's name and avatar while showing who forwarded the message and the message source. Attachments and embeds from the original message are also included.
-- **Link Reaction System**: Automatically adds a 🔗 link emoji to messages containing embeds from supported stores (like LUISAVIAROMA) in specified category channels. The bot will only add the reaction if it detects content from supported stores, optimizing the user experience by only highlighting relevant content.
+- **Link Reaction System**: Automatically adds a 🔗 link emoji to messages containing embeds from supported stores (like LUISAVIAROMA) in specified channels. The bot will only add the reaction if it detects content from supported stores, optimizing the user experience by only highlighting relevant content.
+  - **Multi-store Support**: Now uses a dictionary-based configuration system to handle multiple stores with different detection methods and extraction patterns
+  - **Enhanced Detection**: Supports various detection methods including author name, title, URL patterns, and embed field content
+  - **Direct Channel Monitoring**: Configure specific channels to monitor for each store instead of only using categories
   - **Store Product ID Extraction**: When whitelisted users react with the 🔗 link emoji to embeds from specific stores, the bot extracts product IDs and saves them to configured files:
-    - **LUISAVIAROMA**: Extracts product IDs from embeds with author "LUISAVIAROMA" and saves them to a file specified in the `luisaviaroma_drops_urls_path` environment variable.
+    - **LUISAVIAROMA**: Extracts product IDs from embeds with author "LUISAVIAROMA" and saves them to a configured file, with pattern-based extraction from URLs or embed fields
+  - **Specialized Store Commands**: Added `/luisaviaroma_adder` command for easy configuration of LuisaViaRoma link reactions
 - **Keyword Filter System**: Automatically monitors messages in specified categories for problematic content using regex patterns.
   - **Pattern Detection**: Uses regular expressions to match against potential threats and unwanted content
   - **Configurable Actions**: Each filter can be set to log, notify, or delete matching messages
@@ -28,6 +32,7 @@ A modular Discord bot system capable of managing multiple functional modules wit
   - **Preset Filters**: Comes with preconfigured filters for common threats like Discord scam links and invite links
   - **Pattern Management**: Add, remove, or modify patterns through slash commands
   - **Category/Channel Control**: Apply filtering only to specific categories with the ability to blacklist channels
+- **Improved Settings Management**: Refactored configuration system to use direct settings manager access instead of property accessors, providing more consistent behavior and better error handling
 
 ## Project Structure
 
@@ -49,6 +54,11 @@ discord_bot_project/
 │   └── pinger_cog.py         # Ping notification functionality
 ├── modules/                  # Functional modules (legacy architecture)
 │   ├── mod/                  # Moderation module
+│   │   ├── link_reaction/    # Link reaction functionality
+│   │   │   ├── link_reaction.py  # Main link reaction logic
+│   │   │   └── store_manager.py  # Store configuration manager
+│   │   ├── reaction_forward/ # Reaction forward functionality  
+│   │   └── keyword_filter/   # Keyword filter functionality
 │   ├── online/               # Online interaction module
 │   └── instore/              # In-store interaction module
 ├── utils/                    # Utility functions
@@ -143,7 +153,7 @@ python register_commands.py
 
 ## Adding New Commands
 
-1. Add the command to the central registry in `core/command_registry.py`:
+1. Add the command to the central registry in `core/command_sync.py`:
    ```python
    # Register your new command
    @bot.tree.command(
@@ -272,6 +282,55 @@ EMBED_THUMBNAIL_URL=https://example.com/thumbnail.png
 EMBED_DEFAULT_TITLE=Notification
 EMBED_INCLUDE_TIMESTAMP=True
 ```
+
+## Link Reaction Module
+
+The Link Reaction module monitors messages in specified channels and categories for embeds or links from supported stores, and adds a link emoji reaction to them. When a user with the appropriate permissions clicks on this reaction, the bot extracts product information and saves it to a file.
+
+### Features
+
+- Monitors messages in specified channels and categories
+- Automatically detects embeds and links from configured stores
+- Adds a customizable link emoji (🔗 by default) to messages with recognized store content
+- Extracts product IDs when users react with the link emoji
+- Saves product IDs to store-specific files for tracking
+- Fully configurable through slash commands or environment variables
+- Multi-store support with customizable detection methods
+
+### Store Configuration
+
+The Link Reaction module supports a dictionary-based store configuration system:
+
+```json
+"STORES": {
+  "luisaviaroma": {
+    "enabled": true,
+    "name": "LUISAVIAROMA",
+    "description": "Extract product IDs from LUISAVIAROMA embeds",
+    "channel_ids": [123456789, 987654321],
+    "detection": {
+      "type": "author_name",
+      "value": "LUISAVIAROMA"
+    },
+    "extraction": {
+      "primary": "url",
+      "pattern": "\\/[^\\/]+\\/([^\\/]+)$",
+      "fallback": "field_pid"
+    },
+    "file_path": "/path/to/luisaviaroma_ids.txt"
+  }
+}
+```
+
+### Configuration Commands
+
+- **Using the `/link-reaction` command**:
+  - `/link-reaction` - Shows current configuration for all stores
+  - `/link-reaction store_name:StoreName` - Shows configuration for a specific store
+  
+- **Using the `/luisaviaroma_adder` command**:
+  - `/luisaviaroma_adder` - Shows current LuisaViaRoma configuration
+  - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
 
 # Quick Start
 

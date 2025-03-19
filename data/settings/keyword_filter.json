@@ -54,6 +54,23 @@
       "keywords": [
         "ciao3"
       ]
+    },
+    "asics": {
+      "enabled": true,
+      "name": "asics",
+      "description": "Rule created by giveme11us",
+      "category_ids": [
+        811979420461301760,
+        727968909755416596
+      ],
+      "channel_ids": [],
+      "blacklist_ids": [],
+      "alert_channel_id": 969208183799296030,
+      "severity": "medium",
+      "action": "notify",
+      "keywords": [
+        "ciao2"
+      ]
     }
   },
   "FILTERS": {
