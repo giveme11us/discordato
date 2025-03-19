@@ -10,6 +10,7 @@
 | **mod** | Pinger | Monitors for @ mentions and sends notifications | *No slash commands, automatic* |
 | **instore** | In-store Monitoring | Features related to in-store product monitoring | *Commands not visible in provided code* |
 | **online** | Online Monitoring | Features related to online product monitoring | *Commands not visible in provided code* |
+| **redeye** | Profile Management | View and manage profiles stored in CSV files | `/redeye-profiles`, `/redeye-config` |
 
 ## Detailed Command Reference
 
@@ -78,6 +79,35 @@ Specialized command to configure LuisaViaRoma link reactions with simplified par
 - `/luisaviaroma_adder channel_ids:123456789,987654321` - Sets channels to monitor (keeps existing file path)
 - `/luisaviaroma_adder file_path:/path/to/luisaviaroma_ids.txt` - Updates the file path (keeps existing channels)
 - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/luisaviaroma_ids.txt` - Fully configures both channels and file path
+
+### Redeye Module
+
+#### `/redeye-profiles`
+
+View profiles stored in the profiles CSV file.
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `profile_name` | Name of a specific profile to view in detail | No |
+
+**Usage Examples:**
+- `/redeye-profiles` - Displays all profiles with basic information
+- `/redeye-profiles profile_name:MyProfile1` - Shows detailed information for a specific profile
+
+#### `/redeye-config`
+
+Configure the Redeye module settings.
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `profiles_path` | Path to the profiles CSV file | No |
+| `tasks_path` | Path to the tasks CSV file | No |
+
+**Usage Examples:**
+- `/redeye-config` - Displays current configuration
+- `/redeye-config profiles_path:/path/to/profiles.csv` - Updates profiles CSV path
+- `/redeye-config tasks_path:/path/to/tasks.csv` - Updates tasks CSV path
+- `/redeye-config profiles_path:/path/to/profiles.csv tasks_path:/path/to/tasks.csv` - Updates both file paths
 
 ### Other Features
 

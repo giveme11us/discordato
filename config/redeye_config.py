@@ -15,7 +15,7 @@ logger = logging.getLogger('discord_bot.config.redeye_config')
 # Default settings
 DEFAULT_CONFIG = {
     # Feature toggle
-    "ENABLED": False,
+    "ENABLED": True,
     
     # Waitlist configurations
     "WAITLISTS": {},
@@ -38,14 +38,31 @@ DEFAULT_CONFIG = {
 # Initialize the settings manager with default configuration
 settings_manager = get_manager("redeye", DEFAULT_CONFIG)
 
+# Hard-coded file paths from environment variables
+PROFILES_PATH = os.getenv('REDEYE_PROFILES_PATH', '/Users/ivansposato/Documents/projects/easycopeu/discord/data/redeye/profiles.csv')
+TASKS_PATH = os.getenv('REDEYE_TASKS_PATH', '/Users/ivansposato/Documents/projects/easycopeu/discord/data/redeye/tasks.csv')
+
+# Log the configured file paths
+logger.info(f"Redeye profiles path: {PROFILES_PATH}")
+logger.info(f"Redeye tasks path: {TASKS_PATH}")
+
+# Check if the files exist and log warnings if they don't
+if not os.path.exists(PROFILES_PATH):
+    logger.warning(f"Redeye profiles file does not exist at: {PROFILES_PATH}")
+
+if not os.path.exists(TASKS_PATH):
+    logger.warning(f"Redeye tasks file does not exist at: {TASKS_PATH}")
+
 # Create properties to access settings
 
 @property
 def ENABLED() -> bool:
-    return settings_manager.get("ENABLED", False)
+    """Whether the Redeye module is enabled."""
+    return settings_manager.get("ENABLED", DEFAULT_CONFIG["ENABLED"])
 
 @ENABLED.setter
 def ENABLED(value: bool):
+    """Set whether the Redeye module is enabled."""
     settings_manager.set("ENABLED", bool(value))
 
 @property
@@ -65,14 +82,14 @@ def ROLE_REQUIREMENTS(value: Dict[str, List[int]]):
     settings_manager.set("ROLE_REQUIREMENTS", value)
 
 @property
-def NOTIFICATION_CHANNEL_ID() -> Union[int, None]:
-    return settings_manager.get("NOTIFICATION_CHANNEL_ID")
+def NOTIFICATION_CHANNEL_ID() -> int:
+    """ID of the channel where notifications should be sent."""
+    return settings_manager.get("NOTIFICATION_CHANNEL_ID", DEFAULT_CONFIG["NOTIFICATION_CHANNEL_ID"])
 
 @NOTIFICATION_CHANNEL_ID.setter
-def NOTIFICATION_CHANNEL_ID(value: Union[int, None]):
-    if value is not None:
-        value = int(value)
-    settings_manager.set("NOTIFICATION_CHANNEL_ID", value)
+def NOTIFICATION_CHANNEL_ID(value: int):
+    """Set the ID of the channel where notifications should be sent."""
+    settings_manager.set("NOTIFICATION_CHANNEL_ID", int(value) if value is not None else None)
 
 @property
 def STATUS_EMOJIS() -> Dict[str, str]:

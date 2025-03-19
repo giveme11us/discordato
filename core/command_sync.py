@@ -885,7 +885,12 @@ class CommandSync:
                 store_name = "LUISAVIAROMA"
                 
                 # Check if store already exists in configuration
-                existing_store = stores.get(store_id)
+                existing_store = stores.get(store_id) if isinstance(stores, dict) else None
+                if not existing_store and isinstance(stores, list):
+                    for store in stores:
+                        if isinstance(store, dict) and store.get('name', '').lower() == "luisaviaroma":
+                            existing_store = store
+                            break
                 
                 # If no parameters provided, show current configuration
                 if not any([channel_ids, file_path]):

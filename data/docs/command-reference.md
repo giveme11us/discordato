@@ -30,7 +30,7 @@ This document provides a complete reference for all commands available in the Di
 
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `/redeye-config` | Configure the Redeye module | `/redeye-config [status, enable, add-waitlist, remove-waitlist, list-waitlists, set-notification-channel]` |
+| `/redeye-profiles` | View profiles from the profiles.csv file | `/redeye-profiles [profile_name]` |
 
 ## Context Menu Commands
 
@@ -113,17 +113,16 @@ Removes product IDs from tracking and manages LuisaViaRoma configuration.
 - `/luisaviaroma_remover pid:ABC123` - Removes the specified product ID
 - `/luisaviaroma_remover channel_ids:123456789,987654321 file_path:/path/to/ids.txt` - Updates configuration
 
-### `/redeye-config`
+### `/redeye-profiles`
 
-Configures the Redeye waitlist management system.
+View profiles from the Redeye profiles.csv file.
 
 **Parameters:**
-- Various subcommands for different configuration options
+- `profile_name`: Optional name of a specific profile to view
 
 **Examples:**
-- `/redeye-config status`
-- `/redeye-config enable true`
-- `/redeye-config add-waitlist waitlist_id role_id`
+- `/redeye-profiles` - Lists all available profiles with basic information
+- `/redeye-profiles profile_name:Test` - Shows detailed information for the "Test" profile
 
 ## Using Context Menu Commands
 
@@ -152,5 +151,5 @@ Different commands require different permission levels:
 | `/pinger` | Mod roles defined in `MOD_WHITELIST_ROLE_IDS` |
 | `/luisaviaroma_adder` | Mod roles defined in `MOD_WHITELIST_ROLE_IDS` |
 | `/luisaviaroma_remover` | Mod roles defined in `MOD_WHITELIST_ROLE_IDS` |
-| `/redeye-config` | Redeye roles defined in `REDEYE_WHITELIST_ROLE_IDS` |
+| `/redeye-profiles` | Redeye roles defined in `REDEYE_WHITELIST_ROLE_IDS` |
 | **Remove PID** (context menu) | Mod roles defined in `MOD_WHITELIST_ROLE_IDS` | 

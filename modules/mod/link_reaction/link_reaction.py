@@ -94,7 +94,7 @@ async def process_message(message):
     if not (channel_matches_store or category_match):
         logger.debug(f"Channel {message.channel.name} is not monitored (ID: {message.channel.id})")
         return
-        
+    
     if whitelist_role_ids and not (message.webhook_id or message.application_id):
         # Convert author's roles to set of IDs for quick lookup
         author_role_ids = {role.id for role in message.author.roles}
@@ -119,7 +119,7 @@ async def process_message(message):
             logger.info(f"Message is from webhook with ID: {message.webhook_id}")
         elif message.application_id:
             logger.info(f"Message is from application with ID: {message.application_id}")
-    
+        
     # Initialize has_supported_store_embed variable
     has_supported_store_embed = False
     detected_stores = []
@@ -164,12 +164,12 @@ async def process_message(message):
                             is_match = True
                             logger.debug(f"Match on field content: {field.name} / {field.value}")
                             break
-                
-                if is_match:
-                    logger.info(f"Found supported store embed: {store_config.get('name', store_id)}")
-                    has_supported_store_embed = True
-                    detected_stores.append(store_id)
-                    break  # Found a match for this embed
+                    
+                    if is_match:
+                        logger.info(f"Found supported store embed: {store_config.get('name', store_id)}")
+                        has_supported_store_embed = True
+                        detected_stores.append(store_id)
+                        break  # Found a match for this embed
             
             # Log detailed embed information
             if embed.title:
@@ -414,7 +414,7 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
                     pid_value = raw_value.replace("```", "").strip()
                     logger.info(f"Found PID in field: {pid_value}")
                     break
-        
+                
         # If we found a PID, save it to the configured file path
         if pid_value:
             # Get file path from store config - use the user-set path
@@ -428,56 +428,78 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
                     needs_newline = False
                     file_empty = True
                     
-                    # Create directory if it doesn't exist
+                    # Create directory if it doesn\'t exist
+
+                    
                     os.makedirs(os.path.dirname(os.path.abspath(store_file_path)), exist_ok=True)
 
+                    
+                    
+
+                    
                     if os.path.exists(store_file_path) and os.path.getsize(store_file_path) > 0:
                         with open(store_file_path, "r") as f:
                             # Read all existing PIDs
                             existing_content = f.read()
                             existing_pids = {line.strip() for line in existing_content.splitlines() if line.strip()}
-
+                            
                             # Check if file ends with newline
                             needs_newline = not existing_content.endswith('\n')
 
-                            # Check if file is empty
-                            file_empty = not existing_content.strip()
+                        # Check if file is empty
+                        file_empty = not existing_content.strip()
+                        
+                        logger.debug(f"Found {len(existing_pids)} existing PIDs in file")
+                        
+                    # Check if PID already exists in the file
+                    if pid_value in existing_pids:
+                        logger.info(f"PID {pid_value} already exists in file, skipping")
+                        # Send DM instead of channel message
+                        await user.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                        return
+                    
+                    # Append the PID to the file
 
-                            logger.debug(f"Found {len(existing_pids)} existing PIDs in file")
-                            
-                            # Check if PID already exists in the file
-                            if pid_value in existing_pids:
-                                logger.info(f"PID {pid_value} already exists in file, skipping")
-                                # Send DM instead of channel message
-                                await user.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
-                                return
+                    
+                    with open(store_file_path, "a") as f:
 
-                            # Append the PID to the file
-                            with open(store_file_path, "a") as f:
-                                if needs_newline:
-                                    f.write(f"\n{pid_value}\n")
-                                    logger.info(f"Added newline before writing PID")
-                                elif file_empty:
-                                    f.write(f"{pid_value}\n")
-                                else:
-                                    f.write(f"{pid_value}\n")
+                    
+                        if needs_newline:
 
-                            logger.info(f"Successfully added PID {pid_value} to {store_file_path}")
+                    
+                            f.write(f"\n{pid_value}\n")
 
-                            # Send confirmation as DM to the user instead of to the channel
-                            await user.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                    
+                            logger.info(f"Added newline before writing PID")
+
+                    
+                        elif file_empty:
+
+                    
+                            f.write(f"{pid_value}\n")
+
+                    
+                        else:
+
+                    
+                            f.write(f"{pid_value}\n")
+                    
+                    logger.info(f"Successfully added PID {pid_value} to {store_file_path}")
+                    
+                    # Send confirmation as DM to the user instead of to the channel
+                    await user.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
                 except Exception as e:
                     logger.error(f"Failed to write PID to file: {str(e)}")
-                    # Send error as DM
-                    await user.send(f"❌ Error saving product ID: {str(e)}")
-            else:
-                logger.error(f"No file path configured for {store_config.get('name', 'LUISAVIAROMA')}")
-                # Send error as DM
-                await user.send(f"❌ Error: {store_config.get('name', 'LUISAVIAROMA')} file path not configured.")
-        else:
-            logger.warning(f"No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed")
             # Send error as DM
-            await user.send(f"❌ No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed.")
+            await user.send(f"❌ Error saving product ID: {str(e)}")
+        else:
+            logger.error(f"No file path configured for {store_config.get('name', 'LUISAVIAROMA')}")
+            # Send error as DM
+            await user.send(f"❌ Error: {store_config.get('name', 'LUISAVIAROMA')} file path not configured.")
+    else:
+        logger.warning(f"No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed")
+        # Send error as DM
+        await user.send(f"❌ No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed.")
 
 def setup_link_reaction(bot):
     """

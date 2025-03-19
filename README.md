@@ -33,13 +33,15 @@ A modular Discord bot system capable of managing multiple functional modules wit
   - **Preset Filters**: Comes with preconfigured filters for common threats like Discord scam links and invite links
   - **Pattern Management**: Add, remove, or modify patterns through slash commands
   - **Category/Channel Control**: Apply filtering only to specific categories with the ability to blacklist channels
-- **Redeye Module**: A specialized system for managing role-based waitlists for various purposes.
+- **Redeye Module**: A specialized system for managing profiles and tasks with role-based access control.
   - **Role-Based Access Control**: Dedicated permission system with separate whitelist for the redeye module
-  - **Waitlist Management**: Create and manage multiple waitlists with custom configurations
-  - **Role Requirements**: Associate specific roles with waitlists to control eligibility
-  - **User Position Tracking**: Track and manage user positions in waitlists
-  - **Status Indicators**: Custom emoji status indicators for waitlist entries (waiting, approved, denied, expired)
-  - **Notification System**: Configurable notifications for waitlist status changes
+  - **CSV File Integration**: Reads and parses CSV files for profiles and tasks
+  - **Profile Management**: View all profiles with basic information or detailed views of specific profiles
+  - **File Path Configuration**: Configure and update file paths through commands
+  - **Formatted Displays**: Information is displayed in formatted embeds with field grouping
+  - **Webhook Integration**: Support for Discord webhooks in profile configurations
+  - **Personal Information Management**: Structured format for viewing shipping and personal details
+  - **Connection & Proxy Settings**: Manage timeout, delay and connection settings for profiles
 - **Improved Settings Management**: Refactored configuration system to use direct settings manager access instead of property accessors, providing more consistent behavior and better error handling
 
 ## Project Structure
@@ -355,32 +357,19 @@ The Link Reaction module supports a dictionary-based store configuration system:
 
 ## Redeye Module
 
-The Redeye module provides functionality for managing role-based waitlists for various purposes. It allows administrators to create and manage waitlists with role-based access controls.
+The Redeye module provides functionality for viewing and managing profiles from CSV files.
 
 ### Features
 
-- **Multiple Waitlists**: Create and manage separate waitlists for different purposes
-- **Role-Based Access Control**: Associate specific roles with waitlists to control eligibility
-- **Position Tracking**: Track user positions in waitlists
-- **Status Management**: Custom status indicators (waiting, approved, denied, expired) with emoji
-- **Notifications**: Configurable notification channel for waitlist status changes
-- **Separate Permission System**: Uses its own whitelist separate from other modules
+- **CSV File Integration**: Reads and parses CSV files for profiles and tasks
+- **Role-Based Access Control**: Dedicated permission system with separate whitelist for the redeye module
+- **Hardcoded File Paths**: File paths are hardcoded in environment variables for security
+- **Profile Viewing**: View all profiles or detailed information for specific profiles
+- **Formatted Displays**: Information is displayed in formatted embeds with field grouping
 
 ### Configuration
 
-You can configure the Redeye module using the `/redeye-config` command:
-
-- `/redeye-config status` - Shows current waitlists and configuration
-- `/redeye-config enable true|false` - Enable or disable the module
-- `/redeye-config add-waitlist [waitlist_id]` - Create a new waitlist
-- `/redeye-config add-waitlist [waitlist_id] [role_id]` - Create a waitlist with role requirement
-- `/redeye-config remove-waitlist [waitlist_id]` - Remove a waitlist
-- `/redeye-config list-waitlists` - View all configured waitlists
-- `/redeye-config set-notification-channel #channel` - Set the notification channel
-
-### Environment Variables
-
-The Redeye module uses the following environment variables:
+You can configure the Redeye module using environment variables:
 
 ```env
 # Enable the redeye module
@@ -388,15 +377,18 @@ ENABLED_MODULES=mod,online,instore,redeye
 
 # Whitelist roles that can access redeye module commands
 REDEYE_WHITELIST_ROLE_IDS=811975979492704337,969204849101119528
+
+# Hardcoded file paths for CSV files
+REDEYE_PROFILES_PATH=/path/to/profiles.csv
+REDEYE_TASKS_PATH=/path/to/tasks.csv
 ```
 
-### Permissions System
+### Commands
 
-The Redeye module has its own permission system separate from other modules:
+- `/redeye-profiles` - View all profiles with basic information
+- `/redeye-profiles profile_name:NAME` - View detailed information for a specific profile
 
-1. The `REDEYE_WHITELIST_ROLE_IDS` environment variable specifies which roles can use redeye commands
-2. This whitelist is independent from other module whitelists like `MOD_WHITELIST_ROLE_IDS`
-3. Users without the required roles will see a permission denied message listing the roles they need
+For detailed documentation, see the [Redeye Module Documentation](data/docs/redeye-module.md).
 
 # Quick Start
 

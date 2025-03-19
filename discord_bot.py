@@ -154,8 +154,8 @@ def main():
             from modules.mod.reaction_forward.reaction_forward import setup_reaction_forward
             from modules.mod.link_reaction.link_reaction import setup_link_reaction
             from modules.mod.pinger.pinger import setup_pinger
-            # Import the new redeye module
-            from modules.redeye.redeye import setup_redeye
+            # Import the new redeye module profile command
+            from modules.redeye.profile_cmd import setup_profile_cmd
             
             # Set up event handlers directly
             logger.info("Setting up direct event handlers for message and reaction processing")
@@ -294,9 +294,12 @@ def main():
                     pinger_config.NOTIFICATION_CHANNEL_ID = original_notif_channel_prop
                     pinger_config.WHITELIST_ROLE_IDS = original_whitelist_prop
             
-            def setup_redeye_wrapper(bot):
+            def setup_profile_cmd_wrapper(bot):
                 """
                 Initialize the redeye module by working around property issues.
+                
+                This function temporarily overrides property accessors with fixed values
+                to ensure consistent behavior during initialization.
                 
                 Args:
                     bot: The Discord bot instance
@@ -304,38 +307,26 @@ def main():
                 Returns:
                     bool: True if successful, False otherwise
                 """
+                # Import the redeye configuration
+                from config import redeye_config
+                
                 try:
-                    logger.info("Setting up redeye module with wrapper")
+                    # Access raw values from settings manager
+                    original_enabled = redeye_config.settings_manager.get("ENABLED", True)
+                    original_notification_channel = redeye_config.settings_manager.get("NOTIFICATION_CHANNEL_ID", None)
                     
-                    # We need to directly access the settings_manager to bypass property issues
-                    from config import redeye_config
-                    
-                    # Get the original settings
-                    original_enabled = redeye_config.settings_manager.get("ENABLED")
-                    original_waitlists = redeye_config.settings_manager.get("WAITLISTS")
-                    original_role_requirements = redeye_config.settings_manager.get("ROLE_REQUIREMENTS")
-                    original_notification_channel = redeye_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
-                    original_status_emojis = redeye_config.settings_manager.get("STATUS_EMOJIS")
+                    # Store original properties
+                    original_enabled_prop = redeye_config.ENABLED
+                    original_notification_channel_prop = redeye_config.NOTIFICATION_CHANNEL_ID
                     
                     # Override them with fixed properties
                     redeye_config.ENABLED = original_enabled
-                    redeye_config.WAITLISTS = original_waitlists
-                    redeye_config.ROLE_REQUIREMENTS = original_role_requirements
                     redeye_config.NOTIFICATION_CHANNEL_ID = original_notification_channel
-                    redeye_config.STATUS_EMOJIS = original_status_emojis
                     
-                    # Now call the actual setup function
-                    from modules.redeye.redeye import setup_redeye
-                    setup_redeye(bot)
+                    # Now call the actual setup function for the profile command
+                    from modules.redeye.profile_cmd import setup_profile_cmd
+                    setup_profile_cmd(bot)
                     
-                    # Also register the config command
-                    try:
-                        from modules.redeye.config_cmd import setup_config_cmd
-                        setup_config_cmd(bot)
-                        logger.info("Redeye config command registered successfully")
-                    except Exception as e:
-                        logger.error(f"Error registering redeye config command: {e}")
-                        
                     # Restore original settings if needed
                     return True
                 except Exception as e:
@@ -404,7 +395,7 @@ def main():
                     
                     # Set up the redeye module
                     try:
-                        setup_redeye_wrapper(bot)
+                        setup_profile_cmd_wrapper(bot)
                         logger.info("Redeye module set up successfully")
                     except Exception as e:
                         logger.error(f"Error setting up redeye module: {e}")
