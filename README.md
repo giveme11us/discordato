@@ -332,6 +332,38 @@ The Link Reaction module supports a dictionary-based store configuration system:
   - `/luisaviaroma_adder` - Shows current LuisaViaRoma configuration
   - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
 
+## Admin Roles System
+
+The bot includes a permission system that restricts access to configuration commands to users with specific roles.
+
+### Features
+
+- **Role-based Permissions**: Only users with designated admin roles can use configuration commands
+- **Server Admin Control**: Option to allow or restrict server administrators' access to config commands
+- **Command Protection**: All configuration commands (`/general`, `/keyword`, `/reaction`, `/pinger`, `/luisaviaroma_adder`) require admin permissions
+- **Self-managing**: The permission system itself is managed through the `/admin-roles` command
+
+### Configuration
+
+Use the `/admin-roles` command to manage who can access configuration commands:
+
+- `/admin-roles` - View current admin roles and settings
+- `/admin-roles action:add role:@Role` - Add a role to the admin list
+- `/admin-roles action:remove role:@Role` - Remove a role from the admin list
+- `/admin-roles action:server-admins-on` - Allow server admins to use config commands (default)
+- `/admin-roles action:server-admins-off` - Require specific admin roles for all users
+
+### Default Behavior
+
+By default, server administrators (users with the Administrator permission) can use all configuration commands, even if they don't have a specific admin role. You can change this with the `server-admins-off` action if you want stricter control.
+
+### Security Considerations
+
+- Keep the list of admin roles small and limited to trusted users
+- Consider using Discord's built-in role hierarchy to manage permissions
+- If you disable server admin access, ensure you have at least one role in the admin list
+- All permission changes are logged for audit purposes
+
 # Quick Start
 
 ```bash

@@ -10,6 +10,8 @@ import asyncio
 from discord import app_commands
 from config import settings
 from config.environment import is_development
+from utils.permission_checks import is_admin
+from config import admin_roles_config
 
 logger = logging.getLogger('discord_bot.command_sync')
 
@@ -127,6 +129,7 @@ class CommandSync:
         try:
             # General status command - provides overview of all configurations
             @bot.tree.command(name="general", description="View bot status and configuration overview")
+            @is_admin()
             async def general(interaction: discord.Interaction):
                 """Show bot status and configuration for all modules"""
                 
@@ -321,6 +324,7 @@ class CommandSync:
             
             # Keyword Filter Command - Simplified name
             @bot.tree.command(name="keyword", description="Set up keyword filtering")
+            @is_admin()
             async def keyword(
                 interaction: discord.Interaction,
                 name: str = None,       # Rule name
@@ -562,6 +566,7 @@ class CommandSync:
             
             # Reaction Forward Command - Simplified name
             @bot.tree.command(name="reaction", description="Set up reaction forwarding")
+            @is_admin()
             async def reaction(
                 interaction: discord.Interaction,
                 categories: str = None,
@@ -698,6 +703,7 @@ class CommandSync:
             
             # Pinger Command - Simplified name
             @bot.tree.command(name="pinger", description="Configure mention notifications")
+            @is_admin()
             async def pinger(
                 interaction: discord.Interaction,
                 channel: str = None,
@@ -834,6 +840,7 @@ class CommandSync:
 
             # LuisaViaRoma Adder - Specialized command for LVR store setup
             @bot.tree.command(name="luisaviaroma_adder", description="Set up LuisaViaRoma link reactions")
+            @is_admin()
             async def luisaviaroma_adder(
                 interaction: discord.Interaction,
                 channel_ids: str = None,
@@ -998,6 +1005,111 @@ class CommandSync:
                     await interaction.response.send_message(response, ephemeral=True)
                 else:
                     await interaction.response.send_message("⚠️ Failed to save settings", ephemeral=True)
+            
+            # Admin Roles Command
+            @bot.tree.command(name="admin-roles", description="Manage admin roles for configuration commands")
+            @is_admin()
+            async def admin_roles_command(
+                interaction: discord.Interaction,
+                action: str = None,
+                role: discord.Role = None
+            ):
+                """
+                Manage admin roles that can use configuration commands.
+                """
+                # Import configuration
+                from config import embed_config
+                
+                # If no parameters provided, show current configuration
+                if not action:
+                    # Create embed to display current roles
+                    embed = discord.Embed(
+                        title="Admin Roles Configuration",
+                        description="Roles that can use configuration commands",
+                    )
+                    
+                    # Apply styling
+                    embed = embed_config.apply_default_styling(embed)
+                    
+                    # Get current admin roles
+                    admin_role_ids = admin_roles_config.get_admin_roles()
+                    allow_server_admins = admin_roles_config.settings_manager.get("ALLOW_SERVER_ADMINS", True)
+                    
+                    # Display server admin setting
+                    embed.add_field(
+                        name="Server Administrators", 
+                        value=f"**{'Allowed' if allow_server_admins else 'Not Allowed'}** to use configuration commands", 
+                        inline=False
+                    )
+                    
+                    # Display admin roles
+                    role_mentions = []
+                    for role_id in admin_role_ids:
+                        role = interaction.guild.get_role(role_id)
+                        if role:
+                            role_mentions.append(f"{role.mention} ({role_id})")
+                        else:
+                            role_mentions.append(f"Unknown Role ({role_id})")
+                    
+                    if role_mentions:
+                        embed.add_field(
+                            name="Admin Roles", 
+                            value="\n".join(role_mentions), 
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="Admin Roles", 
+                            value="No admin roles configured", 
+                            inline=False
+                        )
+                    
+                    # Help section
+                    embed.add_field(
+                        name="Usage", 
+                        value=(
+                            "`/admin-roles action:add role:@Role` - Add a role to the admin list\n"
+                            "`/admin-roles action:remove role:@Role` - Remove a role from the admin list\n"
+                            "`/admin-roles action:server-admins-on` - Allow server admins to use config commands\n"
+                            "`/admin-roles action:server-admins-off` - Require specific admin roles for all users"
+                        ), 
+                        inline=False
+                    )
+                    
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                
+                # Process actions
+                if action.lower() == "add":
+                    if not role:
+                        await interaction.response.send_message("⚠️ You must specify a role to add.", ephemeral=True)
+                        return
+                    
+                    if admin_roles_config.add_admin_role(role.id):
+                        await interaction.response.send_message(f"✅ Added {role.mention} to admin roles.", ephemeral=True)
+                    else:
+                        await interaction.response.send_message(f"ℹ️ {role.mention} is already an admin role.", ephemeral=True)
+                
+                elif action.lower() == "remove":
+                    if not role:
+                        await interaction.response.send_message("⚠️ You must specify a role to remove.", ephemeral=True)
+                        return
+                    
+                    if admin_roles_config.remove_admin_role(role.id):
+                        await interaction.response.send_message(f"✅ Removed {role.mention} from admin roles.", ephemeral=True)
+                    else:
+                        await interaction.response.send_message(f"ℹ️ {role.mention} is not an admin role.", ephemeral=True)
+                
+                elif action.lower() == "server-admins-on":
+                    admin_roles_config.set_allow_server_admins(True)
+                    await interaction.response.send_message("✅ Server administrators can now use configuration commands.", ephemeral=True)
+                
+                elif action.lower() == "server-admins-off":
+                    admin_roles_config.set_allow_server_admins(False)
+                    await interaction.response.send_message("✅ Server administrators must now be explicitly added to admin roles.", ephemeral=True)
+                
+                else:
+                    await interaction.response.send_message(f"❌ Unknown action: {action}. Use add, remove, server-admins-on, or server-admins-off.", ephemeral=True)
             
             logger.info("Successfully registered all module commands")
             return True

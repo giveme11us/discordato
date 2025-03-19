@@ -8,10 +8,34 @@
 | **mod** | Reaction Forward | Forwards messages to a destination channel when a specific reaction is added | `/reaction-forward-setup` |
 | **mod** | Link Reaction | Automatically adds reactions to messages containing links from supported stores | `/link-reaction`, `/luisaviaroma_adder` |
 | **mod** | Pinger | Monitors for @ mentions and sends notifications | *No slash commands, automatic* |
+| **core** | Admin Roles | Manages roles that can use configuration commands | `/admin-roles` |
 | **instore** | In-store Monitoring | Features related to in-store product monitoring | *Commands not visible in provided code* |
 | **online** | Online Monitoring | Features related to online product monitoring | *Commands not visible in provided code* |
 
 ## Detailed Command Reference
+
+### Admin Roles Management
+
+#### `/admin-roles`
+
+Configure which roles can use configuration commands.
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | Action to perform: `add`, `remove`, `server-admins-on`, or `server-admins-off` | No |
+| `role` | The role to add or remove (for `add` and `remove` actions) | Only with add/remove |
+
+**Usage Examples:**
+- `/admin-roles` - Shows current configuration
+- `/admin-roles action:add role:@Moderator` - Adds the Moderator role to admin roles
+- `/admin-roles action:remove role:@Helper` - Removes the Helper role from admin roles
+- `/admin-roles action:server-admins-on` - Allows server administrators to use config commands
+- `/admin-roles action:server-admins-off` - Restricts server administrators from using config commands without an admin role
+
+**Notes:**
+- This command requires admin permissions to use (server administrator or an existing admin role)
+- By default, server administrators can use all configuration commands
+- If no admin roles are set, only server administrators can use configuration commands
 
 ### Keyword Filter Module
 
