@@ -14,6 +14,7 @@ import asyncio
 from config import reaction_forward_config as config
 from config import pinger_config
 from config import embed_config
+from config import mod_config
 
 logger = logging.getLogger('discord_bot.modules.mod.reaction_forward')
 
@@ -148,28 +149,6 @@ async def handle_reaction_add(reaction, user):
         reaction: The reaction that was added
         user: The user who added the reaction
     """
-    # Get settings directly from settings manager
-    enabled = config.settings_manager.get("ENABLED", False)
-    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", False)
-    forward_emoji = config.settings_manager.get("FORWARD_EMOJI", "➡️")
-    whitelist_role_ids = config.settings_manager.get("WHITELIST_ROLE_IDS", [])
-    forward_title = config.settings_manager.get("FORWARD_TITLE", "Forwarded Message")
-    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
-    forward_attachments = config.settings_manager.get("FORWARD_ATTACHMENTS", True)
-    forward_embeds = config.settings_manager.get("FORWARD_EMBEDS", True)
-    
-    # Fall back to pinger notification channel if destination channel not set
-    if not destination_channel_id:
-        destination_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
-    
-    # Skip if feature is disabled
-    if not enabled:
-        return
-    
-    # Skip if forwarding is disabled
-    if not enable_forwarding:
-        return
-    
     # Skip if the user is a bot
     if user.bot:
         return
@@ -181,6 +160,11 @@ async def handle_reaction_add(reaction, user):
     if not message.guild:
         return
     
+    # Get settings directly from settings manager
+    enabled = config.settings_manager.get("ENABLED", False)
+    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", False)
+    forward_emoji = config.settings_manager.get("FORWARD_EMOJI", "➡️")
+    
     # Check if the reaction is the forward emoji
     if str(reaction.emoji) != forward_emoji:
         return
@@ -189,19 +173,85 @@ async def handle_reaction_add(reaction, user):
     logger.info(f"Forward reaction added by {user} to message from {message.author} in {message.channel.name}")
     logger.info(f"Message content: {message.content[:100]}{'...' if len(message.content) > 100 else ''}")
     
+    # Skip if feature is disabled
+    if not enabled:
+        logger.warning(f"Reaction Forward feature is disabled. Removing reaction from {user}")
+        try:
+            await message.remove_reaction(reaction.emoji, user)
+        except Exception as e:
+            logger.error(f"Failed to remove reaction: {e}")
+        return
+    
+    # Skip if forwarding is disabled
+    if not enable_forwarding:
+        logger.warning(f"Message forwarding is disabled. Removing reaction from {user}")
+        try:
+            await message.remove_reaction(reaction.emoji, user)
+        except Exception as e:
+            logger.error(f"Failed to remove reaction: {e}")
+        return
+    
+    # Get whitelist role IDs for permission checking
+    whitelist_role_ids = config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+    
+    # Log the whitelist roles we're checking against
+    logger.debug(f"MOD_WHITELIST_ROLE_IDS from mod_config: {mod_config.WHITELIST_ROLE_IDS}")
+    logger.debug(f"Whitelist roles from reaction_forward config: {whitelist_role_ids}")
+    
+    # If whitelist is empty, use the mod_config whitelist
+    if not whitelist_role_ids:
+        whitelist_role_ids = mod_config.WHITELIST_ROLE_IDS
+        logger.debug(f"Using mod_config whitelist: {whitelist_role_ids}")
+    
+    forward_title = config.settings_manager.get("FORWARD_TITLE", "Forwarded Message")
+    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
+    forward_attachments = config.settings_manager.get("FORWARD_ATTACHMENTS", True)
+    forward_embeds = config.settings_manager.get("FORWARD_EMBEDS", True)
+    
+    # Fall back to pinger notification channel if destination channel not set
+    if not destination_channel_id:
+        destination_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+    
     # Check if the user has a whitelisted role
+    has_whitelisted_role = False
     if whitelist_role_ids:
         # Convert user's roles to set of IDs for quick lookup
         user_role_ids = {role.id for role in user.roles}
         
+        # Make sure whitelist_role_ids are integers
+        whitelist_role_ids_int = []
+        for role_id in whitelist_role_ids:
+            try:
+                if isinstance(role_id, str) and role_id.isdigit():
+                    whitelist_role_ids_int.append(int(role_id))
+                elif isinstance(role_id, int):
+                    whitelist_role_ids_int.append(role_id)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid whitelist role ID: {role_id} - {e}")
+        
         # Check if any of the user's roles is in the whitelist
-        has_whitelisted_role = any(role_id in user_role_ids for role_id in whitelist_role_ids)
+        has_whitelisted_role = any(role_id in user_role_ids for role_id in whitelist_role_ids_int)
         
         if not has_whitelisted_role:
-            logger.debug(f"User {user} doesn't have any whitelisted roles to forward messages")
+            logger.warning(f"User {user} attempted to forward message but doesn't have any whitelisted roles. User roles: {user_role_ids}, Whitelist: {whitelist_role_ids_int}")
+            try:
+                # Remove the reaction
+                await message.remove_reaction(reaction.emoji, user)
+                logger.info(f"Removed unauthorized forward reaction from {user}")
+            except Exception as e:
+                logger.error(f"Failed to remove unauthorized reaction: {e}")
             return
-        
-        logger.info(f"User {user} has whitelisted role, forwarding message")
+    else:
+        # If no whitelist roles configured, default to deny all
+        logger.warning(f"No whitelist roles configured, denying forward attempt from {user}")
+        try:
+            await message.remove_reaction(reaction.emoji, user)
+        except Exception as e:
+            logger.error(f"Failed to remove unauthorized reaction: {e}")
+        return
+    
+    # At this point, user has permission to forward
+    logger.info(f"User {user} has whitelisted role, forwarding message")
     
     # Get the notification channel from destination channel ID
     if not destination_channel_id:
@@ -383,16 +433,31 @@ async def handle_reaction_add(reaction, user):
 
 def setup_reaction_forward(bot):
     """
-    Set up the reaction forward feature.
+    Set up the reaction forward feature for a bot.
     
     Args:
-        bot: The Discord bot instance
+        bot: The Discord bot to set up
     """
     logger.info("Setting up reaction_forward feature")
     
-    # Get settings directly from settings manager
+    # Get configuration directly from settings manager
     enabled = config.settings_manager.get("ENABLED", False)
-    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", False)
+    category_ids = config.settings_manager.get("CATEGORY_IDS", [])
+    blacklist_channel_ids = config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
+    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", True)
+    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
+    whitelist_role_ids = config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+    
+    # Convert to a consistent type for logging
+    if isinstance(whitelist_role_ids, set):
+        whitelist_role_ids = list(whitelist_role_ids)
+    
+    # Log the current configuration
+    logger.info(f"Reaction Forward enabled: {enabled}")
+    logger.info(f"Message forwarding enabled: {enable_forwarding}")
+    logger.info(f"Categories to monitor: {category_ids}")
+    logger.info(f"Destination channel ID: {destination_channel_id}")
+    logger.info(f"Whitelisted role IDs: {whitelist_role_ids}")
     
     # Make sure category_ids is a list of integers
     category_ids_raw = config.settings_manager.get("CATEGORY_IDS", [])
@@ -409,9 +474,6 @@ def setup_reaction_forward(bot):
     # Store the processed category_ids back to settings
     config.settings_manager.set("CATEGORY_IDS", category_ids)
             
-    blacklist_channel_ids = config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
-    
     # Fall back to pinger notification channel if destination channel not set
     if not destination_channel_id:
         destination_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")

@@ -69,15 +69,68 @@ def main():
                 error_message = str(error)
                 logger.error(f"Application command error in {interaction.command.name if interaction.command else 'unknown command'}: {error_message}")
                 
-                # Create an error embed with consistent styling
-                embed = discord.Embed(
-                    title="Command Error",
-                    description=f"An error occurred while processing your command.",
-                    color=discord.Color.red()
-                )
-                
-                # Add error details
-                embed.add_field(name="Error Details", value=f"```{error_message}```", inline=False)
+                # Check for permission errors (CheckFailure)
+                if isinstance(error, discord.app_commands.CheckFailure):
+                    # Create a better permission error embed
+                    embed = discord.Embed(
+                        title="Permission Denied",
+                        description="You don't have permission to use this command.",
+                        color=discord.Color.red()
+                    )
+                    
+                    # Add information about required roles
+                    from utils.permissions import get_whitelisted_roles
+                    module_name = 'mod'  # Default to mod since most commands use this
+                    
+                    # Try to extract the module name from the error message
+                    if "module" in error_message.lower():
+                        # New logic to better detect module name
+                        if 'redeye' in error_message.lower():
+                            module_name = 'redeye'
+                        elif 'mod' in error_message.lower():
+                            module_name = 'mod'
+                        elif 'online' in error_message.lower():
+                            module_name = 'online'
+                        elif 'instore' in error_message.lower():
+                            module_name = 'instore'
+                        else:
+                            # Legacy extraction as fallback
+                            module_parts = error_message.lower().split("module")
+                            if len(module_parts) > 1 and module_parts[0].strip().endswith("use "):
+                                # Extract module name, assuming format "... use Module module ..."
+                                extracted_name = module_parts[0].strip().split(" ")[-1].lower()
+                                if extracted_name in ['mod', 'online', 'instore', 'redeye']:
+                                    module_name = extracted_name
+                    
+                    # Get the whitelist roles for this module
+                    role_ids = get_whitelisted_roles(module_name)
+                    logger.debug(f"Permission denied for {module_name} module. Available roles: {role_ids}")
+                    
+                    # Add info about required roles if available
+                    if role_ids:
+                        role_mentions = []
+                        for role_id in role_ids:
+                            role = discord.utils.get(interaction.guild.roles, id=role_id) if interaction.guild else None
+                            if role:
+                                role_mentions.append(f"<@&{role_id}> ({role.name})")
+                            else:
+                                role_mentions.append(f"Role ID: {role_id}")
+                        
+                        embed.add_field(
+                            name="Required Roles",
+                            value="You need one of these roles:\n" + "\n".join(role_mentions),
+                            inline=False
+                        )
+                else:
+                    # Standard error embed for non-permission errors
+                    embed = discord.Embed(
+                        title="Command Error",
+                        description=f"An error occurred while processing your command.",
+                        color=discord.Color.red()
+                    )
+                    
+                    # Add error details
+                    embed.add_field(name="Error Details", value=f"```{error_message}```", inline=False)
                 
                 # Apply default styling from embed_config
                 embed = embed_config.apply_default_styling(embed)
@@ -101,6 +154,8 @@ def main():
             from modules.mod.reaction_forward.reaction_forward import setup_reaction_forward
             from modules.mod.link_reaction.link_reaction import setup_link_reaction
             from modules.mod.pinger.pinger import setup_pinger
+            # Import the new redeye module
+            from modules.redeye.redeye import setup_redeye
             
             # Set up event handlers directly
             logger.info("Setting up direct event handlers for message and reaction processing")
@@ -239,6 +294,54 @@ def main():
                     pinger_config.NOTIFICATION_CHANNEL_ID = original_notif_channel_prop
                     pinger_config.WHITELIST_ROLE_IDS = original_whitelist_prop
             
+            def setup_redeye_wrapper(bot):
+                """
+                Initialize the redeye module by working around property issues.
+                
+                Args:
+                    bot: The Discord bot instance
+                
+                Returns:
+                    bool: True if successful, False otherwise
+                """
+                try:
+                    logger.info("Setting up redeye module with wrapper")
+                    
+                    # We need to directly access the settings_manager to bypass property issues
+                    from config import redeye_config
+                    
+                    # Get the original settings
+                    original_enabled = redeye_config.settings_manager.get("ENABLED")
+                    original_waitlists = redeye_config.settings_manager.get("WAITLISTS")
+                    original_role_requirements = redeye_config.settings_manager.get("ROLE_REQUIREMENTS")
+                    original_notification_channel = redeye_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+                    original_status_emojis = redeye_config.settings_manager.get("STATUS_EMOJIS")
+                    
+                    # Override them with fixed properties
+                    redeye_config.ENABLED = original_enabled
+                    redeye_config.WAITLISTS = original_waitlists
+                    redeye_config.ROLE_REQUIREMENTS = original_role_requirements
+                    redeye_config.NOTIFICATION_CHANNEL_ID = original_notification_channel
+                    redeye_config.STATUS_EMOJIS = original_status_emojis
+                    
+                    # Now call the actual setup function
+                    from modules.redeye.redeye import setup_redeye
+                    setup_redeye(bot)
+                    
+                    # Also register the config command
+                    try:
+                        from modules.redeye.config_cmd import setup_config_cmd
+                        setup_config_cmd(bot)
+                        logger.info("Redeye config command registered successfully")
+                    except Exception as e:
+                        logger.error(f"Error registering redeye config command: {e}")
+                        
+                    # Restore original settings if needed
+                    return True
+                except Exception as e:
+                    logger.error(f"Error setting up redeye module: {e}")
+                    return False
+            
             # Initialize the event handlers tracking
             bot.event_handlers = {}
 
@@ -292,11 +395,19 @@ def main():
                     except AttributeError as e:
                         logger.error(f"Error in link_reaction setup: {str(e)}")
                     
+                    # Set up the pinger module
                     try:
                         setup_pinger_wrapper(bot)
-                        logger.info("Pinger handlers registered")
-                    except AttributeError as e:
-                        logger.error(f"Error in pinger setup: {str(e)}")
+                        logger.info("Pinger module set up successfully")
+                    except Exception as e:
+                        logger.error(f"Error setting up pinger module: {e}")
+                    
+                    # Set up the redeye module
+                    try:
+                        setup_redeye_wrapper(bot)
+                        logger.info("Redeye module set up successfully")
+                    except Exception as e:
+                        logger.error(f"Error setting up redeye module: {e}")
                     
                     # List all registered event handlers for verification
                     event_handlers = {}

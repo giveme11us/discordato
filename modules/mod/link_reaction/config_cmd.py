@@ -12,6 +12,7 @@ import os
 from config import link_reaction_config as config
 from modules.mod.link_reaction.store_manager import store_manager
 from config import embed_config
+from utils.permissions import check_interaction_permissions
 
 logger = logging.getLogger('discord_bot.modules.mod.link_reaction.config_cmd')
 
@@ -54,9 +55,8 @@ async def link_reaction_config(
     value: str = None
 ):
     """Configure the link reaction feature and manage store settings"""
-    # Check permissions - only allow guild admins or users with manage_messages permission
-    if not interaction.user.guild_permissions.administrator and not interaction.user.guild_permissions.manage_messages:
-        await interaction.response.send_message("❌ You need administrator or manage messages permission to use this command.", ephemeral=True)
+    # Check if the user has permission to use this command
+    if not await check_interaction_permissions(interaction, 'mod'):
         return
 
     if action == "view":

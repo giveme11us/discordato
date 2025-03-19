@@ -391,65 +391,63 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
         logger.info(f"Found LuisaViaRoma embed")
         
         # Extract PID from URL or PID field
-        pid_value = None
+                pid_value = None
         
         # Try URL extraction first
         if embed.url:
             logger.info(f"Trying URL extraction for LuisaViaRoma")
             # Extract from URL pattern
-            url_parts = embed.url.split('/')
-            if url_parts and len(url_parts) > 1:
-                potential_pid = url_parts[-1]
+                        url_parts = embed.url.split('/')
+                        if url_parts and len(url_parts) > 1:
+                            potential_pid = url_parts[-1]
                 # Check if it matches LuisaViaRoma PID format (usually has hyphens)
                 if '-' in potential_pid:
-                    pid_value = potential_pid
+                                pid_value = potential_pid
                     logger.info(f"Extracted product ID from URL: {pid_value}")
                 
         # If URL extraction didn't work, try the PID field
         if not pid_value:
-            for field in embed.fields:
-                if field.name.upper() == "PID":
-                    raw_value = field.value
-                    pid_value = raw_value.replace("```", "").strip()
-                    logger.info(f"Found PID in field: {pid_value}")
-                    break
-        
+                    for field in embed.fields:
+                        if field.name.upper() == "PID":
+                            raw_value = field.value
+                            pid_value = raw_value.replace("```", "").strip()
+                            logger.info(f"Found PID in field: {pid_value}")
+                            break
+                
         # If we found a PID, save it to the configured file path
-        if pid_value:
+                if pid_value:
             # Get file path from store config - use the user-set path
             store_file_path = store_config.get('file_path')
-            
-            if store_file_path:
+                    
+                    if store_file_path:
                 logger.info(f"Using file path from store configuration: {store_file_path}")
-                try:
-                    # Check if file exists and if PID is already in the file
-                    existing_pids = set()
-                    needs_newline = False
-                    file_empty = True
+                        try:
+                            # Check if file exists and if PID is already in the file
+                            existing_pids = set()
+                            needs_newline = False
+                            file_empty = True
                     
                     # Create directory if it doesn't exist
                     os.makedirs(os.path.dirname(os.path.abspath(store_file_path)), exist_ok=True)
-
-                    if os.path.exists(store_file_path) and os.path.getsize(store_file_path) > 0:
-                        with open(store_file_path, "r") as f:
-                            # Read all existing PIDs
-                            existing_content = f.read()
-                            existing_pids = {line.strip() for line in existing_content.splitlines() if line.strip()}
-
-                            # Check if file ends with newline
-                            needs_newline = not existing_content.endswith('\n')
-
-                            # Check if file is empty
-                            file_empty = not existing_content.strip()
-
-                            logger.debug(f"Found {len(existing_pids)} existing PIDs in file")
+                            
+                            if os.path.exists(store_file_path) and os.path.getsize(store_file_path) > 0:
+                                with open(store_file_path, "r") as f:
+                                    # Read all existing PIDs
+                                    existing_content = f.read()
+                                    existing_pids = {line.strip() for line in existing_content.splitlines() if line.strip()}
+                                    
+                                    # Check if file ends with newline
+                                    needs_newline = not existing_content.endswith('\n')
+                                    file_empty = not existing_content.strip()
+                                    
+                                    logger.debug(f"Found {len(existing_pids)} existing PIDs in file")
                             
                             # Check if PID already exists in the file
                             if pid_value in existing_pids:
                                 logger.info(f"PID {pid_value} already exists in file, skipping")
-                                await message.channel.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                        await message.channel.send(f"ℹ️ Product ID `{pid_value}` already exists in {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
                                 return
-
+                            
                             # Append the PID to the file
                             with open(store_file_path, "a") as f:
                                 if needs_newline:
@@ -459,18 +457,18 @@ async def process_luisaviaroma_embed(message, user, store_config, embed):
                                     f.write(f"{pid_value}\n")
                                 else:
                                     f.write(f"{pid_value}\n")
-
+                            
                             logger.info(f"Successfully added PID {pid_value} to {store_file_path}")
-
+                            
                             # Send confirmation response
-                            await message.channel.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
-                except Exception as e:
-                    logger.error(f"Failed to write PID to file: {str(e)}")
-                    await message.channel.send(f"❌ Error saving product ID: {str(e)}")
-            else:
+                    await message.channel.send(f"✅ Added product ID `{pid_value}` to {store_config.get('name', 'LUISAVIAROMA')} tracking list.")
+                        except Exception as e:
+                            logger.error(f"Failed to write PID to file: {str(e)}")
+                            await message.channel.send(f"❌ Error saving product ID: {str(e)}")
+                    else:
                 logger.error(f"No file path configured for {store_config.get('name', 'LUISAVIAROMA')}")
                 await message.channel.send(f"❌ Error: {store_config.get('name', 'LUISAVIAROMA')} file path not configured.")
-        else:
+                else:
             logger.warning(f"No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed")
             await message.channel.send(f"❌ No product ID found in this {store_config.get('name', 'LUISAVIAROMA')} embed.")
 

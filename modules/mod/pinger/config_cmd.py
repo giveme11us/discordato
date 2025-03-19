@@ -386,20 +386,27 @@ async def config_command(interaction, setting=None, value=None):
 
 def setup_config_cmd(bot):
     """
-    Register the pinger configuration command with the bot.
+    Register the pinger-config slash command.
     
     Args:
         bot: The Discord bot instance
     """
+    logger.info("Registering pinger-config command")
+    
+    # Import the permission decorator
+    from utils.permissions import mod_only
+    
     @bot.tree.command(
         name="pinger-config",
-        description="Configure the pinger feature"
+        description="Configure the mention notifications feature"
     )
     @app_commands.describe(
-        setting="The setting to view or modify (channel, whitelist, everyone, here, roles)",
-        value="The new value for the setting"
+        setting="The setting to view or modify (channel, everyone, here, roles, whitelist)",
+        action="The action to perform for whitelist (add, remove, clear, view)",
+        value="The value for the action"
     )
-    async def pinger_config(interaction: discord.Interaction, setting: str = None, value: str = None):
-        await config_command(interaction, setting, value)
-    
-    logger.debug("Registered pinger-config command") 
+    @mod_only()
+    async def pinger_config(interaction: discord.Interaction, setting: str = None, action: str = None, value: str = None):
+        await handle_pinger_config(interaction, setting, action, value)
+        
+    logger.info("Registered pinger-config command") 

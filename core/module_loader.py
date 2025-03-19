@@ -75,20 +75,98 @@ class ModuleLoader:
         try:
             # Import the module
             module_path = f"{settings.MODULES_PATH}.{module_name}.module"
-            module = importlib.import_module(module_path)
+            logger.debug(f"Attempting to import module from {module_path}")
+            
+            # Pre-check: If the module is redeye, ensure its configuration exists
+            if module_name == 'redeye':
+                try:
+                    # Try to import the config
+                    import importlib
+                    try:
+                        config_module = importlib.import_module(f"config.{module_name}_config")
+                        logger.debug(f"Successfully imported {module_name}_config module")
+                    except ImportError as e:
+                        logger.error(f"Could not import {module_name}_config, will create a minimal version: {e}")
+                        
+                        # Create a minimal config module dynamically if it doesn't exist
+                        from config.settings_manager import get_manager
+                        # Define minimal default config
+                        DEFAULT_CONFIG = {
+                            "ENABLED": False,
+                            "WAITLISTS": {},
+                            "ROLE_REQUIREMENTS": {},
+                            "NOTIFICATION_CHANNEL_ID": None,
+                            "STATUS_EMOJIS": {
+                                "WAITING": "⏳",
+                                "APPROVED": "✅",
+                                "DENIED": "❌",
+                                "EXPIRED": "⌛"
+                            }
+                        }
+                        
+                        # Create the settings manager
+                        settings_manager = get_manager(module_name, DEFAULT_CONFIG)
+                        
+                        # Create a temporary module
+                        import sys
+                        import types
+                        config_module = types.ModuleType(f'config.{module_name}_config')
+                        config_module.settings_manager = settings_manager
+                        sys.modules[f'config.{module_name}_config'] = config_module
+                        logger.info(f"Created minimal {module_name}_config module")
+                        
+                except Exception as e:
+                    logger.error(f"Error setting up configuration for {module_name}: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    return False
+            
+            try:
+                module = importlib.import_module(module_path)
+                logger.debug(f"Successfully imported module: {module_name}")
+            except ImportError as e:
+                logger.error(f"Import error loading module {module_name}: {str(e)}")
+                # Try to diagnose what part of the import failed
+                try:
+                    parent_module = importlib.import_module(settings.MODULES_PATH)
+                    logger.debug(f"Parent module exists: {parent_module}")
+                    
+                    try:
+                        submodule = importlib.import_module(f"{settings.MODULES_PATH}.{module_name}")
+                        logger.debug(f"Submodule exists: {submodule}")
+                        
+                        # The issue might be with the module.py file itself
+                        logger.error(f"Module {module_name} was found but module.py could not be imported")
+                    except ImportError:
+                        logger.error(f"Submodule {module_name} does not exist or could not be imported")
+                except ImportError:
+                    logger.error(f"Parent module {settings.MODULES_PATH} does not exist or could not be imported")
+                return False
             
             # Check if the module has a setup function
             if hasattr(module, 'setup') and inspect.isfunction(module.setup):
+                logger.debug(f"Found setup function in module: {module_name}")
+                
                 # Get existing commands before setup
                 existing_commands = set(cmd.name for cmd in bot.tree.get_commands())
                 
                 # Call the setup function with our registered commands to avoid duplicates
                 try:
+                    logger.debug(f"Calling setup function for module: {module_name}")
+                    
                     # Try to pass registered_commands as an argument
-                    module.setup(bot, registered_commands=self.registered_commands)
-                except TypeError:
-                    # If that fails, call the original setup function
-                    module.setup(bot)
+                    try:
+                        module.setup(bot, registered_commands=self.registered_commands)
+                    except TypeError:
+                        # If that fails, call the original setup function
+                        module.setup(bot)
+                    
+                    logger.debug(f"Successfully called setup function for module: {module_name}")
+                except Exception as e:
+                    logger.error(f"Error in setup function for module {module_name}: {str(e)}")
+                    import traceback
+                    logger.error(f"Exception traceback: {traceback.format_exc()}")
+                    return False
                 
                 # Get new commands after setup
                 new_commands = set(cmd.name for cmd in bot.tree.get_commands()) - existing_commands
@@ -107,6 +185,8 @@ class ModuleLoader:
                 return False
         except Exception as e:
             logger.error(f"Error loading module {module_name}: {str(e)}")
+            import traceback
+            logger.error(f"Exception traceback: {traceback.format_exc()}")
             return False
     
     def reload_module(self, bot, module_name):

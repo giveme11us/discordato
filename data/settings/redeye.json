@@ -1,0 +1,12 @@
+{
+  "ENABLED": true,
+  "WAITLISTS": {},
+  "ROLE_REQUIREMENTS": {},
+  "NOTIFICATION_CHANNEL_ID": null,
+  "STATUS_EMOJIS": {
+    "WAITING": "\u23f3",
+    "APPROVED": "\u2705",
+    "DENIED": "\u274c",
+    "EXPIRED": "\u231b"
+  }
+}

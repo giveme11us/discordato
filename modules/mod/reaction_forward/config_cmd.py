@@ -293,6 +293,9 @@ def setup_config_cmd(bot):
     """
     logger.info("Registering reaction-forward-config command")
     
+    # Import the permission decorator
+    from utils.permissions import mod_only
+    
     @bot.tree.command(
         name="reaction-forward-config",
         description="Configure the reaction forward feature"
@@ -301,6 +304,7 @@ def setup_config_cmd(bot):
         setting="The setting to view or modify (categories, enable, disable, forwarding, blacklist)",
         value="The new value for the setting"
     )
+    @mod_only()
     async def reaction_forward_config(interaction: discord.Interaction, setting: str = None, value: str = None):
         await handle_reaction_forward_config(interaction, setting, value)
         

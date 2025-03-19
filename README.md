@@ -32,6 +32,13 @@ A modular Discord bot system capable of managing multiple functional modules wit
   - **Preset Filters**: Comes with preconfigured filters for common threats like Discord scam links and invite links
   - **Pattern Management**: Add, remove, or modify patterns through slash commands
   - **Category/Channel Control**: Apply filtering only to specific categories with the ability to blacklist channels
+- **Redeye Module**: A specialized system for managing role-based waitlists for various purposes.
+  - **Role-Based Access Control**: Dedicated permission system with separate whitelist for the redeye module
+  - **Waitlist Management**: Create and manage multiple waitlists with custom configurations
+  - **Role Requirements**: Associate specific roles with waitlists to control eligibility
+  - **User Position Tracking**: Track and manage user positions in waitlists
+  - **Status Indicators**: Custom emoji status indicators for waitlist entries (waiting, approved, denied, expired)
+  - **Notification System**: Configurable notifications for waitlist status changes
 - **Improved Settings Management**: Refactored configuration system to use direct settings manager access instead of property accessors, providing more consistent behavior and better error handling
 
 ## Project Structure
@@ -59,6 +66,10 @@ discord_bot_project/
 │   │   │   └── store_manager.py  # Store configuration manager
 │   │   ├── reaction_forward/ # Reaction forward functionality  
 │   │   └── keyword_filter/   # Keyword filter functionality
+│   ├── redeye/               # Redeye module
+│   │   ├── redeye.py         # Main redeye module logic
+│   │   ├── waitlist.py       # Waitlist management functionality
+│   │   └── config_cmd.py     # Redeye configuration commands
 │   ├── online/               # Online interaction module
 │   └── instore/              # In-store interaction module
 ├── utils/                    # Utility functions
@@ -332,37 +343,50 @@ The Link Reaction module supports a dictionary-based store configuration system:
   - `/luisaviaroma_adder` - Shows current LuisaViaRoma configuration
   - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
 
-## Admin Roles System
+## Redeye Module
 
-The bot includes a permission system that restricts access to configuration commands to users with specific roles.
+The Redeye module provides functionality for managing role-based waitlists for various purposes. It allows administrators to create and manage waitlists with role-based access controls.
 
 ### Features
 
-- **Role-based Permissions**: Only users with designated admin roles can use configuration commands
-- **Server Admin Control**: Option to allow or restrict server administrators' access to config commands
-- **Command Protection**: All configuration commands (`/general`, `/keyword`, `/reaction`, `/pinger`, `/luisaviaroma_adder`) require admin permissions
-- **Self-managing**: The permission system itself is managed through the `/admin-roles` command
+- **Multiple Waitlists**: Create and manage separate waitlists for different purposes
+- **Role-Based Access Control**: Associate specific roles with waitlists to control eligibility
+- **Position Tracking**: Track user positions in waitlists
+- **Status Management**: Custom status indicators (waiting, approved, denied, expired) with emoji
+- **Notifications**: Configurable notification channel for waitlist status changes
+- **Separate Permission System**: Uses its own whitelist separate from other modules
 
 ### Configuration
 
-Use the `/admin-roles` command to manage who can access configuration commands:
+You can configure the Redeye module using the `/redeye-config` command:
 
-- `/admin-roles` - View current admin roles and settings
-- `/admin-roles action:add role:@Role` - Add a role to the admin list
-- `/admin-roles action:remove role:@Role` - Remove a role from the admin list
-- `/admin-roles action:server-admins-on` - Allow server admins to use config commands (default)
-- `/admin-roles action:server-admins-off` - Require specific admin roles for all users
+- `/redeye-config status` - Shows current waitlists and configuration
+- `/redeye-config enable true|false` - Enable or disable the module
+- `/redeye-config add-waitlist [waitlist_id]` - Create a new waitlist
+- `/redeye-config add-waitlist [waitlist_id] [role_id]` - Create a waitlist with role requirement
+- `/redeye-config remove-waitlist [waitlist_id]` - Remove a waitlist
+- `/redeye-config list-waitlists` - View all configured waitlists
+- `/redeye-config set-notification-channel #channel` - Set the notification channel
 
-### Default Behavior
+### Environment Variables
 
-By default, server administrators (users with the Administrator permission) can use all configuration commands, even if they don't have a specific admin role. You can change this with the `server-admins-off` action if you want stricter control.
+The Redeye module uses the following environment variables:
 
-### Security Considerations
+```env
+# Enable the redeye module
+ENABLED_MODULES=mod,online,instore,redeye
 
-- Keep the list of admin roles small and limited to trusted users
-- Consider using Discord's built-in role hierarchy to manage permissions
-- If you disable server admin access, ensure you have at least one role in the admin list
-- All permission changes are logged for audit purposes
+# Whitelist roles that can access redeye module commands
+REDEYE_WHITELIST_ROLE_IDS=811975979492704337,969204849101119528
+```
+
+### Permissions System
+
+The Redeye module has its own permission system separate from other modules:
+
+1. The `REDEYE_WHITELIST_ROLE_IDS` environment variable specifies which roles can use redeye commands
+2. This whitelist is independent from other module whitelists like `MOD_WHITELIST_ROLE_IDS`
+3. Users without the required roles will see a permission denied message listing the roles they need
 
 # Quick Start
 

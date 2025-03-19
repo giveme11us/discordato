@@ -122,7 +122,27 @@ def FORWARD_EMBEDS(value: bool):
 # Role whitelist from mod config
 @property
 def WHITELIST_ROLE_IDS() -> Set[int]:
-    return mod_config.WHITELIST_ROLE_IDS
+    """Get whitelist roles directly from environment variable for safety"""
+    
+    # First, try to get direct from MOD_WHITELIST_ROLE_IDS env var
+    whitelist_str = os.environ.get('MOD_WHITELIST_ROLE_IDS', '')
+    whitelist_ids = set()
+    
+    if whitelist_str:
+        try:
+            # Try to parse the comma-separated list of role IDs
+            whitelist_ids = {int(role_id.strip()) for role_id in whitelist_str.split(',') if role_id.strip()}
+            if whitelist_ids:
+                logger.debug(f"Using whitelist roles from MOD_WHITELIST_ROLE_IDS: {whitelist_ids}")
+                return whitelist_ids
+        except Exception as e:
+            logger.error(f"Error parsing MOD_WHITELIST_ROLE_IDS from env: {e}")
+    
+    # Fallback to mod_config if direct env parsing failed
+    from config import mod_config
+    mod_whitelist = mod_config.WHITELIST_ROLE_IDS
+    logger.debug(f"Using whitelist roles from mod_config: {mod_whitelist}")
+    return set(mod_whitelist)
 
 def save_config() -> bool:
     """

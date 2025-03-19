@@ -50,26 +50,41 @@ class SettingsManager:
         Returns:
             The loaded settings
         """
-        with file_lock:
-            try:
-                if os.path.exists(self.settings_file):
-                    logger.info(f"Loading settings from {self.settings_file}")
-                    with open(self.settings_file, 'r', encoding='utf-8') as f:
-                        loaded_settings = json.load(f)
-                        
-                    # Deep merge with defaults to ensure all required keys exist
-                    self.settings = self._deep_merge(self.default_settings, loaded_settings)
-                    logger.info(f"Loaded settings for module {self.module_name}")
-                else:
-                    # Use defaults if no file exists
-                    self.settings = self.default_settings.copy()
-                    logger.info(f"No settings file found for {self.module_name}, using defaults")
+        # Acquire the lock outside the try block
+        acquired = file_lock.acquire(timeout=5)
+        if not acquired:
+            logger.error(f"Could not acquire file lock for {self.module_name}, timeout after 5 seconds")
+            self.settings = self.default_settings.copy()
+            return self.settings
+            
+        try:
+            if os.path.exists(self.settings_file):
+                logger.info(f"Loading settings from {self.settings_file}")
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    loaded_settings = json.load(f)
                     
-                    # Save defaults to create the file
-                    self.save_settings()
-            except Exception as e:
-                logger.error(f"Error loading settings for {self.module_name}: {str(e)}")
+                # Deep merge with defaults to ensure all required keys exist
+                self.settings = self._deep_merge(self.default_settings, loaded_settings)
+                logger.info(f"Loaded settings for module {self.module_name}")
+            else:
+                # Use defaults if no file exists
                 self.settings = self.default_settings.copy()
+                logger.info(f"No settings file found for {self.module_name}, using defaults")
+                
+                # Save defaults to create the file - but outside the lock to avoid deadlock
+                # We'll save after releasing the lock
+                need_to_save = True
+        except Exception as e:
+            logger.error(f"Error loading settings for {self.module_name}: {str(e)}")
+            self.settings = self.default_settings.copy()
+            need_to_save = True
+        finally:
+            # Always release the lock
+            file_lock.release()
+            
+        # Save defaults outside the lock if needed
+        if 'need_to_save' in locals() and need_to_save:
+            self.save_settings()
                 
         return self.settings
     
@@ -80,29 +95,43 @@ class SettingsManager:
         Returns:
             True if successful, False otherwise
         """
-        with file_lock:
+        # Acquire the lock outside the try block
+        acquired = file_lock.acquire(timeout=5)
+        if not acquired:
+            logger.error(f"Could not acquire file lock for {self.module_name}, timeout after 5 seconds")
+            return False
+            
+        try:
+            # Double-check directory exists
+            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
+            
+            logger.info(f"Saving settings to {self.settings_file}")
+            
+            # Write to a temporary file first
+            temp_file = f"{self.settings_file}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, indent=2)
+            
+            # Then rename it to the actual file name
+            if os.path.exists(self.settings_file):
+                os.replace(temp_file, self.settings_file)
+            else:
+                os.rename(temp_file, self.settings_file)
+                
+            logger.info(f"Saved settings for module {self.module_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving settings for {self.module_name}: {str(e)}")
+            # In case of any error, try to remove the temporary file
             try:
-                # Double-check directory exists
-                os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
-                
-                logger.info(f"Saving settings to {self.settings_file}")
-                
-                # Write to a temporary file first
-                temp_file = f"{self.settings_file}.tmp"
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    json.dump(self.settings, f, indent=2)
-                
-                # Then rename it to the actual file name
-                if os.path.exists(self.settings_file):
-                    os.replace(temp_file, self.settings_file)
-                else:
-                    os.rename(temp_file, self.settings_file)
-                    
-                logger.info(f"Saved settings for module {self.module_name}")
-                return True
-            except Exception as e:
-                logger.error(f"Error saving settings for {self.module_name}: {str(e)}")
-                return False
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception:
+                pass
+            return False
+        finally:
+            # Always release the lock, even if an exception occurred
+            file_lock.release()
     
     def get(self, key: str, default: Optional[Any] = None) -> Any:
         """

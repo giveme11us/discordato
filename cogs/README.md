@@ -10,6 +10,7 @@ This directory contains the Discord.py cogs used by the bot. Cogs are extension 
 - **link_reaction_cog.py**: Adds a link emoji to messages containing embeds from supported stores
 - **reaction_forward_cog.py**: Adds a forward arrow reaction to messages in specified categories
 - **pinger_cog.py**: Monitors mentions (@everyone, @here, and role mentions) and sends notifications
+- **redeye_cog.py**: Manages role-based waitlists with status tracking and notifications
 
 ## Adding a New Cog
 

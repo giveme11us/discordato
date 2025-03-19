@@ -1,54 +1,39 @@
 """
 Number Command
 
-A command that generates a random number within a specified range.
+Placeholder for future in-store number functionality.
 """
 
 import logging
-import random
 import discord
 from discord import app_commands
 
 logger = logging.getLogger('discord_bot.modules.instore.number')
 
-async def number_command(interaction: discord.Interaction, min_value: int = 1, max_value: int = 100):
+async def handle_number_command(interaction: discord.Interaction):
     """
-    Number command handler.
+    Placeholder handler for the number command.
     
     Args:
         interaction: The Discord interaction
-        min_value: The minimum value (inclusive)
-        max_value: The maximum value (inclusive)
     """
-    # Validate input
-    if min_value >= max_value:
-        await interaction.response.send_message("Error: Minimum value must be less than maximum value.", ephemeral=True)
-        return
-    
-    # Generate random number
-    number = random.randint(min_value, max_value)
-    
-    # Send response
-    await interaction.response.send_message(f"🎲 Your random number between {min_value} and {max_value} is: **{number}**")
-    
-    logger.debug(f"Number command executed by {interaction.user} with range {min_value}-{max_value}, result: {number}")
+    await interaction.response.send_message(
+        "This feature is coming soon!",
+        ephemeral=True
+    )
 
 def setup_number(bot):
     """
-    Register the number command with the bot.
+    Set up the number command.
     
     Args:
-        bot: The Discord bot instance
+        bot: The Discord bot to add the command to
     """
     @bot.tree.command(
-        name="number",
-        description="Generate a random number within a specified range"
+        name="store-number",
+        description="In-store number functionality (coming soon)"
     )
-    @app_commands.describe(
-        min_value="The minimum value (default: 1)",
-        max_value="The maximum value (default: 100)"
-    )
-    async def number(interaction: discord.Interaction, min_value: int = 1, max_value: int = 100):
-        await number_command(interaction, min_value, max_value)
+    async def number(interaction: discord.Interaction):
+        await handle_number_command(interaction)
     
     logger.debug("Registered number command") 

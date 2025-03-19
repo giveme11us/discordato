@@ -1,52 +1,37 @@
 """
-Hi Command
+Online Monitoring Command
 
-A greeting command that responds with a personalized message.
+Placeholder for future online monitoring functionality.
 """
 
 import logging
-import random
 import discord
 from discord import app_commands
 
-logger = logging.getLogger('discord_bot.modules.online.hi')
+logger = logging.getLogger('discord_bot.modules.online.monitor')
 
-# List of greetings
-GREETINGS = [
-    "Hello there, {}! How are you doing today?",
-    "Hi, {}! Nice to see you!",
-    "Hey {}! What's up?",
-    "Greetings, {}! How can I assist you today?",
-    "Hi there {}! Hope you're having a great day!"
-]
-
-async def hi_command(interaction: discord.Interaction):
+async def handle_monitor_command(interaction: discord.Interaction):
     """
-    Hi command handler.
+    Placeholder handler for the online monitor command.
     
     Args:
         interaction: The Discord interaction
     """
-    # Get a random greeting
-    greeting = random.choice(GREETINGS).format(interaction.user.display_name)
-    
-    # Send response
-    await interaction.response.send_message(greeting)
-    
-    logger.debug(f"Hi command executed by {interaction.user}")
+    await interaction.response.send_message(
+        "Online monitoring features coming soon!",
+        ephemeral=True
+    )
 
 def setup_hi(bot):
     """
-    Register the hi command with the bot.
+    Set up the online monitor command.
     
     Args:
-        bot: The Discord bot instance
+        bot: The Discord bot to add the command to
     """
     @bot.tree.command(
-        name="hi",
-        description="Get a friendly greeting from the bot"
+        name="online-monitor",
+        description="Online product monitoring features (coming soon)"
     )
-    async def hi(interaction: discord.Interaction):
-        await hi_command(interaction)
-    
-    logger.debug("Registered hi command") 
+    async def monitor(interaction: discord.Interaction):
+        await handle_monitor_command(interaction) 

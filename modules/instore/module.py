@@ -1,61 +1,39 @@
 """
-Instore Module
+In-store Module
 
-This module provides commands for in-store interactions.
+This module contains features related to in-store product monitoring and management.
 """
 
 import logging
-import discord
-from discord import app_commands
-from discord.ext import commands
 
 logger = logging.getLogger('discord_bot.modules.instore')
 
-# Module information
-NAME = "instore"
-DESCRIPTION = "In-store interaction commands"
-
 def setup(bot, registered_commands=None):
     """
-    Set up the instore module.
+    Set up the in-store module for a bot.
     
     Args:
-        bot: The Discord bot instance
-        registered_commands (set, optional): Set of already registered command names
-    """
-    logger.info("Setting up instore module")
+        bot: The Discord bot to set up
+        registered_commands: Set of already registered commands to avoid duplicates
     
-    # Initialize registered_commands if not provided
+    Returns:
+        Set of registered commands
+    """
     if registered_commands is None:
         registered_commands = set()
     
-    # Register commands if not already registered
-    if 'number' not in registered_commands:
-        try:
-            from modules.instore.number import setup_number
-            setup_number(bot)
-            logger.info("Registered number command")
-        except Exception as e:
-            logger.warning(f"Could not register number command: {str(e)}")
-    else:
-        logger.info("Number command already registered, skipping")
+    logger.info("Setting up in-store module")
     
-    # Register event handlers
-    @bot.event
-    async def on_guild_join(guild):
-        # Log guild join
-        logger.info(f"Bot joined guild: {guild.name} (ID: {guild.id})")
-        
-        # Find a suitable channel to send welcome message
-        system_channel = guild.system_channel
-        if system_channel and system_channel.permissions_for(guild.me).send_messages:
-            await system_channel.send("Thanks for adding me to your server! Use `/help` to see available commands.")
+    # Module is being prepared for future features
+    logger.info("In-store module structure ready for future features")
+    
+    return registered_commands
 
 def teardown(bot):
     """
-    Clean up the instore module.
+    Tear down the in-store module.
     
     Args:
-        bot: The Discord bot instance
+        bot: The Discord bot to tear down
     """
-    logger.info("Tearing down instore module") 
+    logger.info("Tearing down in-store module") 

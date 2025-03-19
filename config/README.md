@@ -34,6 +34,7 @@ The configuration system is designed with the following principles:
 - `link_reaction_config.py` - Configuration for link reaction
 - `reaction_forward_config.py` - Configuration for message forwarding
 - `pinger_config.py` - Configuration for mention monitoring
+- `redeye_config.py` - Configuration for the redeye waitlist system
 
 ## Configuration Format
 
@@ -46,6 +47,7 @@ data/
     link_reaction.json
     reaction_forward.json
     pinger.json
+    redeye.json
 ```
 
 ## Management Tools

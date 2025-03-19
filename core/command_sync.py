@@ -10,8 +10,6 @@ import asyncio
 from discord import app_commands
 from config import settings
 from config.environment import is_development
-from utils.permission_checks import is_admin
-from config import admin_roles_config
 
 logger = logging.getLogger('discord_bot.command_sync')
 
@@ -127,9 +125,12 @@ class CommandSync:
             bot: The Discord bot instance
         """
         try:
+            logger.info("Registering simplified module commands")
+            from utils.permissions import mod_only
+            
             # General status command - provides overview of all configurations
             @bot.tree.command(name="general", description="View bot status and configuration overview")
-            @is_admin()
+            @mod_only()
             async def general(interaction: discord.Interaction):
                 """Show bot status and configuration for all modules"""
                 
@@ -324,7 +325,7 @@ class CommandSync:
             
             # Keyword Filter Command - Simplified name
             @bot.tree.command(name="keyword", description="Set up keyword filtering")
-            @is_admin()
+            @mod_only()
             async def keyword(
                 interaction: discord.Interaction,
                 name: str = None,       # Rule name
@@ -565,145 +566,167 @@ class CommandSync:
                     await interaction.followup.send("⚠️ You must provide a rule name and at least one keyword to monitor.")
             
             # Reaction Forward Command - Simplified name
-            @bot.tree.command(name="reaction", description="Set up reaction forwarding")
-            @is_admin()
+            @bot.tree.command(name="reaction", description="Configure reaction forward settings")
+            @mod_only()
             async def reaction(
                 interaction: discord.Interaction,
-                categories: str = None,
-                exclude: str = None
+                whitelisted_category_id: str = None,
+                blacklisted_channel_id: str = None
             ):
+                # Import the permission checker
+                from utils.permissions import check_interaction_permissions
+                
+                # Check if the user has permission to use this command
+                if not await check_interaction_permissions(interaction, 'mod'):
+                    return
+                
                 # Import configuration
                 from config import reaction_forward_config
                 from config import embed_config
                 
-                # Get settings directly from settings manager
-                settings = reaction_forward_config.settings_manager
-                rf_enabled = settings.get("ENABLED", False)
-                rf_category_ids = settings.get("CATEGORY_IDS", [])
-                rf_blacklist_channel_ids = settings.get("BLACKLIST_CHANNEL_IDS", [])
+                # Get current settings
+                enabled = reaction_forward_config.settings_manager.get("ENABLED", False)
+                category_ids = reaction_forward_config.settings_manager.get("CATEGORY_IDS", [])
+                blacklist_channel_ids = reaction_forward_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
                 
-                # If no parameters provided, show current settings with a cleaner embed
-                if not any([categories, exclude]):
+                # If no parameters provided, show current configuration
+                if not any([whitelisted_category_id, blacklisted_channel_id]):
                     embed = discord.Embed(
                         title="Reaction Forward Configuration",
-                        description="Current settings for reaction forwarding",
+                        description="Current settings for the reaction forward feature"
                     )
                     
                     # Apply styling from embed_config
                     embed = embed_config.apply_default_styling(embed)
                     
                     # Status field
-                    status = "Enabled" if rf_enabled else "Disabled"
                     embed.add_field(
                         name="Status", 
-                        value=f"**{status}**", 
+                        value=f"**{'Enabled' if enabled else 'Disabled'}**", 
                         inline=False
                     )
                     
-                    # Monitored Categories
-                    category_names = []
-                    for category_id in rf_category_ids:
+                    # Whitelisted categories
+                    category_mentions = []
+                    for category_id in category_ids:
                         category = discord.utils.get(interaction.guild.categories, id=category_id)
                         if category:
-                            category_names.append(f"#{category.name} ({category_id})")
+                            category_mentions.append(f"{category.name} ({category_id})")
                         else:
-                            category_names.append(f"Unknown ({category_id})")
+                            category_mentions.append(f"Unknown ({category_id})")
                     
                     embed.add_field(
-                        name="Monitored Categories", 
-                        value='\n'.join(category_names) if category_names else "None configured", 
+                        name="Whitelisted Categories", 
+                        value='\n'.join(category_mentions) if category_mentions else "None", 
                         inline=False
                     )
                     
-                    # Blacklisted Channels
-                    blacklist_names = []
-                    for channel_id in rf_blacklist_channel_ids:
+                    # Blacklisted channels
+                    channel_mentions = []
+                    for channel_id in blacklist_channel_ids:
                         channel = discord.utils.get(interaction.guild.channels, id=channel_id)
                         if channel:
-                            blacklist_names.append(f"#{channel.name} ({channel_id})")
+                            channel_mentions.append(f"#{channel.name} ({channel_id})")
                         else:
-                            blacklist_names.append(f"Unknown ({channel_id})")
+                            channel_mentions.append(f"Unknown ({channel_id})")
                     
                     embed.add_field(
                         name="Blacklisted Channels", 
-                        value='\n'.join(blacklist_names) if blacklist_names else "None configured", 
+                        value='\n'.join(channel_mentions) if channel_mentions else "None", 
                         inline=False
                     )
                     
                     # Configuration guide
                     embed.add_field(
                         name="How to Configure", 
-                        value="`/reaction categories:123456789,987654321 exclude:111111111`", 
+                        value="`/reaction whitelisted_category_id:123456789,234567890`\n`/reaction blacklisted_channel_id:987654321`", 
                         inline=False
                     )
                     
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
-                    
-                # Process parameters to update configuration
-                changes_made = False
                 
-                if categories:
-                    # Process the comma-separated list of category IDs
-                    category_list = []
+                # Process whitelisted categories if provided
+                if whitelisted_category_id:
                     try:
-                        for cat in categories.split(','):
-                            if cat.strip():
-                                category_id = int(cat.strip())
-                                category_list.append(category_id)
-                                
-                        # Update the configuration
-                        settings.set("CATEGORY_IDS", category_list)
-                        changes_made = True
-                        logger.info(f"Saved category IDs: {category_list}")
+                        new_category_ids = [int(cat.strip()) for cat in whitelisted_category_id.split(',') if cat.strip().isdigit()]
+                        
+                        if not new_category_ids:
+                            await interaction.response.send_message("⚠️ Invalid category IDs format. Please provide comma-separated numbers.", ephemeral=True)
+                            return
+                        
+                        # Update categories
+                        category_ids = new_category_ids
+                        reaction_forward_config.settings_manager.set("CATEGORY_IDS", category_ids)
+                        
+                        # Ensure the feature is enabled when explicitly configuring it
+                        if not enabled:
+                            reaction_forward_config.settings_manager.set("ENABLED", True)
+                            
                     except ValueError:
-                        await interaction.response.send_message(
-                            "⚠️ Invalid category ID format. Please use comma-separated numbers.",
-                            ephemeral=True
-                        )
+                        await interaction.response.send_message("⚠️ Invalid category ID format. Please use numbers only.", ephemeral=True)
                         return
                 
-                if exclude:
-                    # Process the comma-separated list of channel IDs to exclude
-                    exclude_list = []
+                # Process blacklisted channels if provided
+                if blacklisted_channel_id:
                     try:
-                        for ch in exclude.split(','):
-                            if ch.strip():
-                                channel_id = int(ch.strip())
-                                exclude_list.append(channel_id)
-                                
-                        # Update the configuration
-                        settings.set("BLACKLIST_CHANNEL_IDS", exclude_list)
-                        changes_made = True
+                        new_blacklist_ids = [int(ch.strip()) for ch in blacklisted_channel_id.split(',') if ch.strip().isdigit()]
+                        
+                        if not new_blacklist_ids:
+                            await interaction.response.send_message("⚠️ Invalid channel IDs format. Please provide comma-separated numbers.", ephemeral=True)
+                            return
+                        
+                        # Update blacklist
+                        blacklist_channel_ids = new_blacklist_ids
+                        reaction_forward_config.settings_manager.set("BLACKLIST_CHANNEL_IDS", blacklist_channel_ids)
+                        
+                        # Ensure the feature is enabled when explicitly configuring it
+                        if not enabled:
+                            reaction_forward_config.settings_manager.set("ENABLED", True)
+                            
                     except ValueError:
-                        await interaction.response.send_message(
-                            "⚠️ Invalid channel ID format. Please use comma-separated numbers.",
-                            ephemeral=True
-                        )
+                        await interaction.response.send_message("⚠️ Invalid channel ID format. Please use numbers only.", ephemeral=True)
                         return
                 
-                # If changes were made, enable the feature and save settings
-                if changes_made:
-                    settings.set("ENABLED", True)
-                    settings.save_settings()
+                # Save settings
+                if reaction_forward_config.settings_manager.save_settings():
+                    # Prepare response message
+                    response_parts = ["✅ Reaction forward configuration updated!"]
                     
-                    # Build success message
-                    response = "✅ Reaction forward configured successfully!\n\n"
-                    if categories:
-                        response += f"Categories: `{categories}`\n"
-                    if exclude:
-                        response += f"Excluded channels: `{exclude}`"
+                    if whitelisted_category_id:
+                        category_mentions = []
+                        for category_id in category_ids:
+                            category = discord.utils.get(interaction.guild.categories, id=category_id)
+                            if category:
+                                category_mentions.append(f"{category.name}")
+                            else:
+                                category_mentions.append(f"Unknown ({category_id})")
+                        
+                        if category_mentions:
+                            response_parts.append(f"**Whitelisted Categories**: {', '.join(category_mentions)}")
                     
+                    if blacklisted_channel_id:
+                        channel_mentions = []
+                        for channel_id in blacklist_channel_ids:
+                            channel = discord.utils.get(interaction.guild.channels, id=channel_id)
+                            if channel:
+                                channel_mentions.append(f"#{channel.name}")
+                            else:
+                                channel_mentions.append(f"Unknown ({channel_id})")
+                        
+                        if channel_mentions:
+                            response_parts.append(f"**Blacklisted Channels**: {', '.join(channel_mentions)}")
+                    
+                    response = "\n".join(response_parts)
                     await interaction.response.send_message(response, ephemeral=True)
+                    
+                    logger.info(f"Reaction forward configuration updated by {interaction.user}")
                 else:
-                    await interaction.response.send_message(
-                        "No changes were made to the configuration.",
-                        ephemeral=True
-                    )
+                    await interaction.response.send_message("⚠️ Failed to save settings", ephemeral=True)
             
             # Pinger Command - Simplified name
             @bot.tree.command(name="pinger", description="Configure mention notifications")
-            @is_admin()
+            @mod_only()
             async def pinger(
                 interaction: discord.Interaction,
                 channel: str = None,
@@ -711,6 +734,13 @@ class CommandSync:
                 here: bool = None,
                 roles: bool = None
             ):
+                # Import the permission checker
+                from utils.permissions import check_interaction_permissions
+                
+                # Check if the user has permission to use this command
+                if not await check_interaction_permissions(interaction, 'mod'):
+                    return
+                
                 # Import configuration
                 from config import pinger_config
                 from config import embed_config
@@ -724,7 +754,7 @@ class CommandSync:
                 pn_notif_channel_id = settings.get("NOTIFICATION_CHANNEL_ID")
                 
                 # If no parameters provided, show current settings
-                if not any([channel, everyone is not None, here is not None, roles is not None]):
+                if not any([channel, everyone, here, roles]):
                     embed = discord.Embed(
                         title="Mention Notification Configuration",
                         description="Current settings for mention notifications",
@@ -781,7 +811,7 @@ class CommandSync:
                     # Configuration guide
                     embed.add_field(
                         name="How to Configure", 
-                        value="`/pinger channel:123456789 everyone:true here:true roles:false`", 
+                        value="`/pinger channel:123456789 everyone:true here:true roles:true`", 
                         inline=False
                     )
                     
@@ -802,24 +832,24 @@ class CommandSync:
                             response_parts.append(f"Notification channel: <#{channel_id}>")
                             changes_made = True
                         else:
-                            response_parts.append(f"⚠️ Could not find channel with ID {channel_id}")
+                            response_parts.append(f"⚠️ Could not find channel with ID {channel}")
                     except ValueError:
                         response_parts.append("⚠️ Invalid channel ID format")
                 
                 # Update mention monitoring settings
-                if everyone is not None:
-                    settings.set("MONITOR_EVERYONE", everyone)
-                    response_parts.append(f"Monitor @everyone: {'Enabled' if everyone else 'Disabled'}")
+                if everyone:
+                    settings.set("MONITOR_EVERYONE", True)
+                    response_parts.append("Monitor @everyone: Enabled")
                     changes_made = True
                 
-                if here is not None:
-                    settings.set("MONITOR_HERE", here)
-                    response_parts.append(f"Monitor @here: {'Enabled' if here else 'Disabled'}")
+                if here:
+                    settings.set("MONITOR_HERE", True)
+                    response_parts.append("Monitor @here: Enabled")
                     changes_made = True
                 
-                if roles is not None:
-                    settings.set("MONITOR_ROLES", roles)
-                    response_parts.append(f"Monitor @role mentions: {'Enabled' if roles else 'Disabled'}")
+                if roles:
+                    settings.set("MONITOR_ROLES", True)
+                    response_parts.append("Monitor @role mentions: Enabled")
                     changes_made = True
                 
                 # Enable the module if any settings were changed and it's currently disabled
@@ -840,12 +870,19 @@ class CommandSync:
 
             # LuisaViaRoma Adder - Specialized command for LVR store setup
             @bot.tree.command(name="luisaviaroma_adder", description="Set up LuisaViaRoma link reactions")
-            @is_admin()
+            @mod_only()
             async def luisaviaroma_adder(
                 interaction: discord.Interaction,
                 channel_ids: str = None,
                 file_path: str = None
             ):
+                # Import the permission checker
+                from utils.permissions import check_interaction_permissions
+                
+                # Check if the user has permission to use this command
+                if not await check_interaction_permissions(interaction, 'mod'):
+                    return
+                
                 # Import configuration
                 from config import link_reaction_config
                 from config import embed_config
@@ -1005,111 +1042,6 @@ class CommandSync:
                     await interaction.response.send_message(response, ephemeral=True)
                 else:
                     await interaction.response.send_message("⚠️ Failed to save settings", ephemeral=True)
-            
-            # Admin Roles Command
-            @bot.tree.command(name="admin-roles", description="Manage admin roles for configuration commands")
-            @is_admin()
-            async def admin_roles_command(
-                interaction: discord.Interaction,
-                action: str = None,
-                role: discord.Role = None
-            ):
-                """
-                Manage admin roles that can use configuration commands.
-                """
-                # Import configuration
-                from config import embed_config
-                
-                # If no parameters provided, show current configuration
-                if not action:
-                    # Create embed to display current roles
-                    embed = discord.Embed(
-                        title="Admin Roles Configuration",
-                        description="Roles that can use configuration commands",
-                    )
-                    
-                    # Apply styling
-                    embed = embed_config.apply_default_styling(embed)
-                    
-                    # Get current admin roles
-                    admin_role_ids = admin_roles_config.get_admin_roles()
-                    allow_server_admins = admin_roles_config.settings_manager.get("ALLOW_SERVER_ADMINS", True)
-                    
-                    # Display server admin setting
-                    embed.add_field(
-                        name="Server Administrators", 
-                        value=f"**{'Allowed' if allow_server_admins else 'Not Allowed'}** to use configuration commands", 
-                        inline=False
-                    )
-                    
-                    # Display admin roles
-                    role_mentions = []
-                    for role_id in admin_role_ids:
-                        role = interaction.guild.get_role(role_id)
-                        if role:
-                            role_mentions.append(f"{role.mention} ({role_id})")
-                        else:
-                            role_mentions.append(f"Unknown Role ({role_id})")
-                    
-                    if role_mentions:
-                        embed.add_field(
-                            name="Admin Roles", 
-                            value="\n".join(role_mentions), 
-                            inline=False
-                        )
-                    else:
-                        embed.add_field(
-                            name="Admin Roles", 
-                            value="No admin roles configured", 
-                            inline=False
-                        )
-                    
-                    # Help section
-                    embed.add_field(
-                        name="Usage", 
-                        value=(
-                            "`/admin-roles action:add role:@Role` - Add a role to the admin list\n"
-                            "`/admin-roles action:remove role:@Role` - Remove a role from the admin list\n"
-                            "`/admin-roles action:server-admins-on` - Allow server admins to use config commands\n"
-                            "`/admin-roles action:server-admins-off` - Require specific admin roles for all users"
-                        ), 
-                        inline=False
-                    )
-                    
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return
-                
-                # Process actions
-                if action.lower() == "add":
-                    if not role:
-                        await interaction.response.send_message("⚠️ You must specify a role to add.", ephemeral=True)
-                        return
-                    
-                    if admin_roles_config.add_admin_role(role.id):
-                        await interaction.response.send_message(f"✅ Added {role.mention} to admin roles.", ephemeral=True)
-                    else:
-                        await interaction.response.send_message(f"ℹ️ {role.mention} is already an admin role.", ephemeral=True)
-                
-                elif action.lower() == "remove":
-                    if not role:
-                        await interaction.response.send_message("⚠️ You must specify a role to remove.", ephemeral=True)
-                        return
-                    
-                    if admin_roles_config.remove_admin_role(role.id):
-                        await interaction.response.send_message(f"✅ Removed {role.mention} from admin roles.", ephemeral=True)
-                    else:
-                        await interaction.response.send_message(f"ℹ️ {role.mention} is not an admin role.", ephemeral=True)
-                
-                elif action.lower() == "server-admins-on":
-                    admin_roles_config.set_allow_server_admins(True)
-                    await interaction.response.send_message("✅ Server administrators can now use configuration commands.", ephemeral=True)
-                
-                elif action.lower() == "server-admins-off":
-                    admin_roles_config.set_allow_server_admins(False)
-                    await interaction.response.send_message("✅ Server administrators must now be explicitly added to admin roles.", ephemeral=True)
-                
-                else:
-                    await interaction.response.send_message(f"❌ Unknown action: {action}. Use add, remove, server-admins-on, or server-admins-off.", ephemeral=True)
             
             logger.info("Successfully registered all module commands")
             return True

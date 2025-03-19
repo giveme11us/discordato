@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.ext import commands
 from config import mod_config
 from config import embed_config
+from utils.permissions import mod_only
 
 logger = logging.getLogger('discord_bot.modules.mod.mod_config_cmd')
 
@@ -284,6 +285,7 @@ def setup_config_cmd(bot):
         action="The action to perform (add, remove, clear, view)",
         value="The value for the action (role mention or ID)"
     )
+    @mod_only()
     async def mod_config(
         interaction: discord.Interaction, 
         setting: str = None, 

@@ -18,7 +18,7 @@ BOT_ACTIVITY = "Serving commands"
 
 # Module settings
 MODULES_PATH = "modules"
-ENABLED_MODULES = os.getenv('ENABLED_MODULES', 'mod,online,instore').split(',')
+ENABLED_MODULES = os.getenv('ENABLED_MODULES', 'mod,online,instore,redeye').split(',')
 
 # Command settings
 COMMAND_COOLDOWN = int(os.getenv('COMMAND_COOLDOWN', '3'))  # seconds

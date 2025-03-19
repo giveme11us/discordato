@@ -120,6 +120,14 @@
 - Set up command groups
 - Create basic commands
 
+### 6.4 "redeye" Module
+- Create module structure
+- Implement module.py and waitlist.py components
+- Set up role-based permission system
+- Implement waitlist management commands
+- Create configuration command group (/redeye-config)
+- Set up notification system for waitlist status changes
+
 ## Phase 7: Testing and Validation
 
 ### 7.1 Unit Testing
