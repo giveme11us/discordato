@@ -22,86 +22,103 @@ async def process_message(message):
         message: The Discord message to process
     """
     # Add basic message information for debugging
-    logger.debug(f"Processing message: content='{message.content}', author={message.author}, channel={message.channel.name}, guild={message.guild.name}")
-    logger.debug(f"Message has mention_everyone={message.mention_everyone}, contains '@here'={'@here' in message.content}, role_mentions={len(message.role_mentions)}")
+    try:
+        # Check if the message is in a guild or DM channel
+        if message.guild:
+            channel_info = message.channel.name
+            guild_info = message.guild.name
+        else:
+            channel_info = "DM Channel"
+            guild_info = "Direct Message"
+            
+        logger.debug(f"Processing message: content='{message.content}', author={message.author}, channel={channel_info}, guild={guild_info}")
+        logger.debug(f"Message has mention_everyone={message.mention_everyone}, contains '@here'={'@here' in message.content}, role_mentions={len(message.role_mentions)}")
+    except Exception as e:
+        logger.debug(f"Error logging message info: {str(e)}")
+    
+    # Get current configuration values directly from settings manager
+    notification_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+    monitor_everyone = pinger_config.settings_manager.get("MONITOR_EVERYONE", True)
+    monitor_here = pinger_config.settings_manager.get("MONITOR_HERE", True)
+    monitor_roles = pinger_config.settings_manager.get("MONITOR_ROLES", False)
+    whitelist_role_ids = pinger_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
     
     # Skip if notification channel is not configured
-    if not pinger_config.NOTIFICATION_CHANNEL_ID:
+    if not notification_channel_id:
         logger.warning("Pinger notification channel not configured - PINGER_NOTIFICATION_CHANNEL_ID not set in .env")
         return
     
-    logger.debug(f"Using notification channel ID: {pinger_config.NOTIFICATION_CHANNEL_ID}")
+    logger.debug(f"Using notification channel ID: {notification_channel_id}")
     
     # Skip messages from bots
     if message.author.bot:
         logger.debug(f"Skipping message from bot: {message.author}")
         return
     
-    # Check if the message has any monitored mentions
-    has_everyone = message.mention_everyone and pinger_config.MONITOR_EVERYONE
-    has_here = "@here" in message.content and pinger_config.MONITOR_HERE
-    has_role_mentions = len(message.role_mentions) > 0 and pinger_config.MONITOR_ROLES
+    # Skip direct messages
+    if not message.guild:
+        logger.debug("Skipping direct message")
+        return
     
-    # Skip if message doesn't have any monitored mentions
+    # Check for monitored mentions
+    has_everyone = message.mention_everyone and monitor_everyone
+    has_here = "@here" in message.content and monitor_here
+    has_role_mentions = len(message.role_mentions) > 0 and monitor_roles
+    
     if not (has_everyone or has_here or has_role_mentions):
         logger.debug("Skipping message - no monitored mentions detected")
         logger.debug(f"Mention details: everyone={has_everyone}, here={has_here}, roles={has_role_mentions}")
         return
     
-    logger.debug(f"Mention detected in message: mention_everyone={has_everyone}, contains @here={has_here}, role_mentions={has_role_mentions}")
-    
-    # Log user roles for debugging
-    user_roles = [f"{role.name} (ID: {role.id})" for role in message.author.roles]
-    logger.debug(f"User {message.author} has roles: {', '.join(user_roles)}")
-    logger.debug(f"Whitelist role IDs: {pinger_config.WHITELIST_ROLE_IDS}")
-    
-    # Check if the user has a whitelisted role - only users with whitelisted roles can trigger notifications
+    # Check if user has a whitelisted role (if whitelist is enabled)
     user_has_whitelisted_role = False
+    
+    # Log whitelist for debugging
+    logger.debug(f"Whitelist role IDs: {whitelist_role_ids}")
+    
+    # Check each of the user's roles
     for role in message.author.roles:
-        if role.id in pinger_config.WHITELIST_ROLE_IDS:
-            logger.debug(f"User {message.author} has whitelisted role {role.name} (ID: {role.id}), can trigger notifications")
+        if role.id in whitelist_role_ids:
             user_has_whitelisted_role = True
+            logger.debug(f"User {message.author} has whitelisted role {role.name}")
             break
     
-    # If no whitelisted roles and whitelist is not empty, ignore this ping
-    if not user_has_whitelisted_role and pinger_config.WHITELIST_ROLE_IDS:
+    # Skip if whitelist is enabled and user doesn't have a whitelisted role
+    if not user_has_whitelisted_role and whitelist_role_ids:
         logger.debug(f"User {message.author} has no whitelisted roles, ignoring ping")
         return
     
     logger.debug(f"User {message.author} ping will trigger notification")
     
-    # Determine which type of ping was used
-    ping_type = None
-    role_name = None
-    
+    # Get details on what was mentioned
+    ping_type = ""
+    ping_target = ""
     if has_everyone:
         ping_type = "@everyone"
-        logger.debug(f"Detected @everyone ping, MONITOR_EVERYONE={pinger_config.MONITOR_EVERYONE}")
+        ping_target = "server members"
+        logger.debug(f"Detected @everyone ping, MONITOR_EVERYONE={monitor_everyone}")
     elif has_here:
         ping_type = "@here"
-        logger.debug(f"Detected @here ping, MONITOR_HERE={pinger_config.MONITOR_HERE}")
+        ping_target = "online members"
+        logger.debug(f"Detected @here ping, MONITOR_HERE={monitor_here}")
     elif has_role_mentions:
-        # Use the first role mention if there are multiple
-        role = message.role_mentions[0]
-        ping_type = f"@{role.name}"
-        role_name = role.name
-        logger.debug(f"Detected role ping: {ping_type}, MONITOR_ROLES={pinger_config.MONITOR_ROLES}")
+        role_names = [role.name for role in message.role_mentions]
+        ping_type = f"@{role_names[0]}" if len(role_names) == 1 else f"@{role_names[0]} +{len(role_names)-1}"
+        ping_target = ", ".join([f"@{role.name}" for role in message.role_mentions[:3]])
+        if len(message.role_mentions) > 3:
+            ping_target += f" +{len(message.role_mentions) - 3} more"
+        logger.debug(f"Detected role ping: {ping_type}, MONITOR_ROLES={monitor_roles}")
     
-    # If no monitored ping type was found, skip
-    if not ping_type:
-        logger.debug("Skipping - no monitored ping type detected")
-        return
-    
-    logger.debug(f"Ping type detected: {ping_type}")
-    
-    # Get the notification channel
-    notification_channel = message.guild.get_channel(pinger_config.NOTIFICATION_CHANNEL_ID)
-    if not notification_channel:
-        logger.warning(f"Could not find notification channel with ID {pinger_config.NOTIFICATION_CHANNEL_ID} in guild {message.guild.name} (ID: {message.guild.id})")
-        
-        # Log all available channels for debugging
-        available_channels = [f"{channel.name} (ID: {channel.id})" for channel in message.guild.channels]
-        logger.debug(f"Available channels in guild: {', '.join(available_channels)}")
+    # Find out which channel to notify in
+    notification_channel = None
+    try:
+        # Get the notification channel
+        notification_channel = message.guild.get_channel(notification_channel_id)
+        if not notification_channel:
+            logger.warning(f"Could not find notification channel with ID {notification_channel_id} in guild {message.guild.name} (ID: {message.guild.id})")
+            return
+    except Exception as e:
+        logger.error(f"Error while getting notification channel: {str(e)}")
         return
     
     logger.debug(f"Found notification channel: {notification_channel.name} (ID: {notification_channel.id})")
@@ -135,12 +152,14 @@ def create_ping_notification_embed(message, ping_type):
     Returns:
         discord.Embed: The notification embed
     """
+    # Get title directly from settings manager to avoid property object issue
+    notification_title = pinger_config.settings_manager.get("NOTIFICATION_TITLE", "IMPORTANT PING")
+    
     embed = discord.Embed(
-        title=pinger_config.NOTIFICATION_TITLE,
+        title=notification_title,
     )
     
-    # Add ping-specific fields
-    embed.add_field(name="Role:", value=ping_type, inline=False)
+    # Add channel field only (removing the Role field)
     embed.add_field(name="Channel:", value=f"<#{message.channel.id}>", inline=False)
     
     # Set timestamp from the message
@@ -173,47 +192,52 @@ def create_jump_button(message):
 
 def setup_pinger(bot):
     """
-    Set up the pinger feature.
+    Set up the pinger feature for a bot.
     
     Args:
-        bot: The Discord bot instance
+        bot: The Discord bot to set up
     """
     logger.info("Setting up pinger feature")
-    logger.info(f"Pinger configuration: notification_channel_id={pinger_config.NOTIFICATION_CHANNEL_ID}, whitelist_role_ids={pinger_config.WHITELIST_ROLE_IDS}")
-    logger.info(f"Monitoring settings: monitor_everyone={pinger_config.MONITOR_EVERYONE}, monitor_here={pinger_config.MONITOR_HERE}")
     
-    # Store a reference to the original on_message handler if it exists
-    original_on_message = bot.event(bot.on_message) if hasattr(bot, 'on_message') else None
+    # Use settings_manager directly to get the most current values
+    notification_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+    whitelist_role_ids = pinger_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+    monitor_everyone = pinger_config.settings_manager.get("MONITOR_EVERYONE", True)
+    monitor_here = pinger_config.settings_manager.get("MONITOR_HERE", True)
+    monitor_roles = pinger_config.settings_manager.get("MONITOR_ROLES", False)
+    
+    # Log the configuration
+    logger.info(f"Pinger configuration: notification_channel_id={notification_channel_id}, whitelist_role_ids={whitelist_role_ids}")
+    logger.info(f"Monitoring settings: monitor_everyone={monitor_everyone}, monitor_here={monitor_here}, monitor_roles={monitor_roles}")
+    
+    # Store the original on_message handler if it exists
+    original_on_message = getattr(bot, 'on_message', None)
     logger.debug(f"Original on_message handler exists: {original_on_message is not None}")
     
-    # Define a new on_message handler that combines our functionality with the original
-    @bot.event
-    async def on_message(message):
+    # Listen for messages to detect mentions
+    @bot.listen('on_message')
+    async def on_message_pinger(message):
+        """
+        Listen for messages with mentions and send notifications.
+        
+        Args:
+            message: The Discord message to process
+        """
         try:
-            # Process the message for pings
-            logger.debug(f"Received message from {message.author}: '{message.content}'")
+            # Process the message for mentions
             await process_message(message)
         except Exception as e:
             logger.error(f"Error in pinger on_message handler: {str(e)}")
-            logger.error(f"Error type: {type(e).__name__}")
             import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Exception traceback: {traceback.format_exc()}")
         
         # Call the original handler if it exists
-        if original_on_message:
-            try:
+        try:
+            if original_on_message:
                 logger.debug("Calling original on_message handler")
                 await original_on_message(message)
-            except Exception as e:
-                logger.error(f"Error in original on_message handler: {str(e)}")
-        else:
-            # If no original handler, at least process commands
-            if not message.author.bot:
-                try:
-                    logger.debug("Processing commands")
-                    await bot.process_commands(message)
-                except Exception as e:
-                    logger.error(f"Error processing commands: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error in original on_message handler: {str(e)}")
     
     logger.info("Pinger feature set up successfully")
     

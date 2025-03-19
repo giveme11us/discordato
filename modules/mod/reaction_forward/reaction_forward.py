@@ -9,10 +9,16 @@ to the notification channel by reacting with the forward arrow.
 
 import logging
 import discord
+import os
+import asyncio
 from config import reaction_forward_config as config
 from config import pinger_config
+from config import embed_config
 
 logger = logging.getLogger('discord_bot.modules.mod.reaction_forward')
+
+# Define emoji for forwarding
+forward_emoji = "➡️"
 
 async def process_message(message):
     """
@@ -22,12 +28,36 @@ async def process_message(message):
     Args:
         message: The Discord message to process
     """
+    # Get settings directly from settings manager
+    enabled = config.settings_manager.get("ENABLED", False)
+    category_ids_raw = config.settings_manager.get("CATEGORY_IDS", [])
+    
+    # Make sure category_ids is a list of integers
+    category_ids = []
+    for cat_id in category_ids_raw:
+        try:
+            if isinstance(cat_id, str) and cat_id.isdigit():
+                category_ids.append(int(cat_id))
+            elif isinstance(cat_id, int):
+                category_ids.append(cat_id)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid category ID in settings: {cat_id} - {e}")
+    
+    blacklist_channel_ids = config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
+    forward_emoji = config.settings_manager.get("FORWARD_EMOJI", "➡️")
+    
+    # Log detailed debug information on every message
+    if hasattr(message.channel, 'name') and hasattr(message.channel, 'category_id'):
+        logger.debug(f"Processing message in channel: {message.channel.name}, category_id: {message.channel.category_id}")
+        logger.debug(f"Enabled: {enabled}, Category IDs: {category_ids}")
+    
     # Skip if feature is disabled
-    if not config.ENABLED:
+    if not enabled:
+        logger.debug("Feature is disabled, skipping")
         return
     
     # Skip if no categories are configured
-    if not config.CATEGORY_IDS:
+    if not category_ids:
         logger.debug("No category IDs configured for reaction_forward feature")
         return
     
@@ -42,105 +72,71 @@ async def process_message(message):
         return
     
     # Skip if not in a guild or not in a channel with a category
-    if not message.guild or not message.channel.category_id:
+    if not message.guild or not hasattr(message.channel, 'category_id') or not message.channel.category_id:
+        logger.debug("Message not in guild or channel has no category")
         return
     
     # Skip if the channel is in the blacklist
-    if message.channel.id in config.BLACKLIST_CHANNEL_IDS:
+    if message.channel.id in blacklist_channel_ids:
         logger.debug(f"Skipping message in blacklisted channel: {message.channel.name}")
         return
     
-    # Skip if the channel is the notification channel (to avoid adding reactions to forwarded messages)
-    notification_channel_id = pinger_config.NOTIFICATION_CHANNEL_ID
+    # Skip if the channel is the pinger notification channel to avoid loops
+    notification_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
     if message.channel.id == notification_channel_id:
-        logger.debug(f"Skipping message in notification channel to avoid reaction loops")
+        logger.debug(f"Skipping message in notification channel (ID: {notification_channel_id})")
         return
     
+    # Debug the category check
+    logger.debug(f"Message category ID: {message.channel.category_id}, Whitelist: {category_ids}")
+    category_match = message.channel.category_id in category_ids
+    logger.debug(f"Category match result: {category_match}")
+    
     # Check if the message's category is in our whitelist
-    if message.channel.category_id in config.CATEGORY_IDS:
-        # If whitelist is enabled, check if user has a whitelisted role
-        # Skip role check for webhooks and app messages
-        if config.WHITELIST_ROLE_IDS and not (message.webhook_id or message.application_id):
-            # Convert author's roles to set of IDs for quick lookup
-            author_role_ids = {role.id for role in message.author.roles}
-            
-            # Check if any of the author's roles is in the whitelist
-            has_whitelisted_role = any(role_id in author_role_ids for role_id in config.WHITELIST_ROLE_IDS)
-            
-            if not has_whitelisted_role:
-                logger.debug(f"User {message.author} doesn't have any whitelisted roles")
-                return
-            
-            logger.debug(f"User {message.author} has whitelisted role, processing message")
+    if category_match:
+        logger.debug(f"Message in category {message.channel.category_id} matches whitelisted categories: {category_ids}")
         
-        # Log detailed information about the incoming message
-        logger.info(f"Processing new message in whitelisted category from {message.author} in {message.channel.name}")
-        logger.info(f"Full message content: {message.content}")
-        logger.info(f"Message ID: {message.id} | Channel: {message.channel.name} | Category: {message.channel.category.name}")
-        
-        # Log additional message metadata
-        if message.webhook_id:
-            logger.info(f"Message is from webhook with ID: {message.webhook_id}")
-        elif message.application_id:
-            logger.info(f"Message is from application with ID: {message.application_id}")
-        
-        # Log message reference if it exists (for replies)
-        if message.reference:
-            logger.info(f"Message is a reply to message ID: {message.reference.message_id}")
-        
-        # Get message data as dict for debugging
-        message_data = {
-            'id': message.id,
-            'content_length': len(message.content),
-            'author': str(message.author),
-            'channel': str(message.channel),
-            'created_at': str(message.created_at),
-            'embeds_count': len(message.embeds),
-            'attachments_count': len(message.attachments),
-            'reference': str(message.reference) if message.reference else None,
-        }
-        logger.info(f"Message metadata: {message_data}")
-        
-        # Log raw message data for debugging
         try:
-            # Log embed information if present
-            if message.embeds:
-                logger.info(f"Incoming message contains {len(message.embeds)} embeds")
-                for i, embed in enumerate(message.embeds):
-                    logger.info(f"Incoming embed #{i+1} details:")
-                    embed_dict = embed.to_dict()
-                    logger.info(f"Embed raw data: {embed_dict}")
-                    
-                    if embed.title:
-                        logger.info(f"  - Title: {embed.title}")
-                    if embed.description:
-                        logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
-                    if embed.fields:
-                        logger.info(f"  - Fields: {len(embed.fields)}")
-                        for j, field in enumerate(embed.fields):
-                            logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
+            # Log the incoming message information for tracking
+            logger.debug(f"Processing message: {message.id} from {message.author} in {message.channel.name}")
+            logger.debug(f"Message content: {message.content[:50]}{'...' if len(message.content) > 50 else ''}")
             
-            # Log attachment information if present
+            # Log additional details for webhooks and apps
+            if message.webhook_id:
+                logger.debug(f"Message is from webhook with ID: {message.webhook_id}")
+            elif message.application_id:
+                logger.debug(f"Message is from application with ID: {message.application_id}")
+            
+            # Log content summary for debugging
+            if message.embeds:
+                logger.debug(f"Message has {len(message.embeds)} embeds")
             if message.attachments:
-                logger.info(f"Incoming message contains {len(message.attachments)} attachments")
-                for i, attachment in enumerate(message.attachments):
-                    logger.info(f"Attachment #{i+1}: {attachment.filename} ({attachment.size} bytes, {attachment.content_type})")
+                logger.debug(f"Message has {len(message.attachments)} attachments")
+            if message.reference:
+                logger.debug(f"Message is a reply to message ID: {message.reference.message_id}")
         except Exception as e:
             logger.error(f"Error logging incoming message data: {str(e)}")
         
+        # Check if the message has embeds - only react if it does
+        if not message.embeds:
+            logger.debug(f"Skipping reaction - message has no embeds")
+            return
+            
         # For webhook/app messages or whitelisted users:
-        logger.debug(f"Adding forward reaction to message in category {message.channel.category}")
+        logger.debug(f"Adding forward reaction to message with embeds in category {message.channel.category}")
         try:
             # Add the forward arrow reaction
-            await message.add_reaction(config.FORWARD_EMOJI)
+            await message.add_reaction(forward_emoji)
             if message.webhook_id:
-                logger.info(f"Added forward reaction to webhook message in {message.channel.name}")
+                logger.info(f"Added forward reaction to webhook message with embeds in {message.channel.name}")
             elif message.application_id:
-                logger.info(f"Added forward reaction to app message in {message.channel.name}")
+                logger.info(f"Added forward reaction to app message with embeds in {message.channel.name}")
             else:
-                logger.info(f"Added forward reaction to message from {message.author} in {message.channel.name}")
+                logger.info(f"Added forward reaction to message with embeds from {message.author} in {message.channel.name}")
         except Exception as e:
             logger.error(f"Failed to add reaction: {str(e)}")
+    else:
+        logger.debug(f"Message in category {message.channel.category_id} does not match any whitelisted categories: {category_ids}")
 
 async def handle_reaction_add(reaction, user):
     """
@@ -152,12 +148,26 @@ async def handle_reaction_add(reaction, user):
         reaction: The reaction that was added
         user: The user who added the reaction
     """
+    # Get settings directly from settings manager
+    enabled = config.settings_manager.get("ENABLED", False)
+    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", False)
+    forward_emoji = config.settings_manager.get("FORWARD_EMOJI", "➡️")
+    whitelist_role_ids = config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+    forward_title = config.settings_manager.get("FORWARD_TITLE", "Forwarded Message")
+    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
+    forward_attachments = config.settings_manager.get("FORWARD_ATTACHMENTS", True)
+    forward_embeds = config.settings_manager.get("FORWARD_EMBEDS", True)
+    
+    # Fall back to pinger notification channel if destination channel not set
+    if not destination_channel_id:
+        destination_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+    
     # Skip if feature is disabled
-    if not config.ENABLED:
+    if not enabled:
         return
     
     # Skip if forwarding is disabled
-    if not config.ENABLE_FORWARDING:
+    if not enable_forwarding:
         return
     
     # Skip if the user is a bot
@@ -172,86 +182,42 @@ async def handle_reaction_add(reaction, user):
         return
     
     # Check if the reaction is the forward emoji
-    if str(reaction.emoji) != config.FORWARD_EMOJI:
+    if str(reaction.emoji) != forward_emoji:
         return
     
     # Log detailed information about the message being forwarded
     logger.info(f"Forward reaction added by {user} to message from {message.author} in {message.channel.name}")
     logger.info(f"Message content: {message.content[:100]}{'...' if len(message.content) > 100 else ''}")
     
-    # Log raw message data for debugging
-    try:
-        # Get message data as dict for debugging
-        message_data = {
-            'id': message.id,
-            'content': message.content[:200] + ('...' if len(message.content) > 200 else ''),
-            'author': str(message.author),
-            'channel': str(message.channel),
-            'created_at': str(message.created_at),
-            'embeds_count': len(message.embeds),
-            'attachments_count': len(message.attachments),
-            'reference': str(message.reference) if message.reference else None,
-        }
-        logger.info(f"Message data: {message_data}")
-        
-        # Log embed raw data
-        if message.embeds:
-            logger.info(f"Message contains {len(message.embeds)} embeds to be forwarded")
-            for i, embed in enumerate(message.embeds):
-                embed_dict = embed.to_dict()
-                logger.info(f"Raw embed #{i+1} data: {embed_dict}")
-                
-                # Log specific embed components in a more readable format
-                logger.info(f"Embed #{i+1} components:")
-                if embed.title:
-                    logger.info(f"  - Title: {embed.title}")
-                if embed.description:
-                    logger.info(f"  - Description: {embed.description[:100]}{'...' if len(embed.description) > 100 else ''}")
-                if embed.fields:
-                    for j, field in enumerate(embed.fields):
-                        logger.info(f"  - Field #{j+1}: '{field.name}' = '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
-                if embed.footer:
-                    logger.info(f"  - Footer: {embed.footer.text}")
-                if embed.author:
-                    logger.info(f"  - Author: {embed.author.name}")
-                    logger.info(f"    - Author icon: {embed.author.icon_url}")
-                if embed.image:
-                    logger.info(f"  - Image URL: {embed.image.url}")
-                if embed.thumbnail:
-                    logger.info(f"  - Thumbnail URL: {embed.thumbnail.url}")
-    except Exception as e:
-        logger.error(f"Error logging message data: {str(e)}")
-    
     # Check if the user has a whitelisted role
-    if config.WHITELIST_ROLE_IDS:
+    if whitelist_role_ids:
         # Convert user's roles to set of IDs for quick lookup
         user_role_ids = {role.id for role in user.roles}
         
         # Check if any of the user's roles is in the whitelist
-        has_whitelisted_role = any(role_id in user_role_ids for role_id in config.WHITELIST_ROLE_IDS)
+        has_whitelisted_role = any(role_id in user_role_ids for role_id in whitelist_role_ids)
         
         if not has_whitelisted_role:
             logger.debug(f"User {user} doesn't have any whitelisted roles to forward messages")
             return
         
-        logger.debug(f"User {user} has whitelisted role, processing forward request")
+        logger.info(f"User {user} has whitelisted role, forwarding message")
     
-    # Get the notification channel ID from pinger config
-    notification_channel_id = pinger_config.NOTIFICATION_CHANNEL_ID
-    if not notification_channel_id:
-        logger.warning("No notification channel configured - cannot forward message")
+    # Get the notification channel from destination channel ID
+    if not destination_channel_id:
+        logger.warning("No destination channel configured - cannot forward message")
         return
     
-    # Get the notification channel
-    notification_channel = message.guild.get_channel(notification_channel_id)
-    if not notification_channel:
-        logger.warning(f"Notification channel with ID {notification_channel_id} not found")
+    # Get the destination channel
+    destination_channel = message.guild.get_channel(destination_channel_id)
+    if not destination_channel:
+        logger.warning(f"Destination channel with ID {destination_channel_id} not found")
         return
     
     try:
         # Use Discord's official message forwarding feature
         # Create the webhook to send the message
-        webhooks = await notification_channel.webhooks()
+        webhooks = await destination_channel.webhooks()
         webhook = None
         
         # Look for an existing webhook we can use
@@ -262,7 +228,7 @@ async def handle_reaction_add(reaction, user):
         
         # Create a new webhook if needed
         if webhook is None:
-            webhook = await notification_channel.create_webhook(name="MessageForwarder", reason="For message forwarding feature")
+            webhook = await destination_channel.create_webhook(name="MessageForwarder", reason="For message forwarding feature")
         
         # Forward the message using the webhook
         # This preserves the original author's name and avatar
@@ -305,34 +271,6 @@ async def handle_reaction_add(reaction, user):
             for i, attachment in enumerate(message.attachments):
                 logger.info(f"Attachment #{i+1}: {attachment.filename} ({attachment.size} bytes, {attachment.content_type})")
         
-        # First option (preferred): Use Discord's native message reference
-        try:
-            # Create a message reference to the original message
-            message_reference = discord.MessageReference(
-                message_id=message.id,
-                channel_id=message.channel.id,
-                guild_id=message.guild.id
-            )
-            
-            # Create a string for the forwarded by info
-            forwarder_info = f"Forwarded by {user.mention} from {message.channel.mention}"
-            
-            # Forward with native reference + informational text
-            forward_msg = await notification_channel.send(
-                content=forwarder_info,
-                reference=message_reference,
-                allowed_mentions=discord.AllowedMentions.none()
-            )
-            
-            logger.info(f"Message from {message.author} forwarded to {notification_channel.name} by {user} using native reference")
-            logger.info(f"Native reference data: message_id={message.id}, channel_id={message.channel.id}, guild_id={message.guild.id}")
-            
-            return
-        except discord.errors.HTTPException as e:
-            # If the native reference fails, log it and fall back to the webhook method
-            logger.warning(f"Native message reference failed: {str(e)}. Falling back to webhook method.")
-        
-        # Fallback to webhook method if native reference fails
         # Send the message
         await webhook.send(
             content=message.content,
@@ -344,24 +282,7 @@ async def handle_reaction_add(reaction, user):
             embeds=message.embeds if message.embeds else []
         )
         
-        # Send a note about who forwarded it and the message source
-        source_info = ""
-        if message.webhook_id:
-            source_info = " (webhook message)"
-        elif message.application_id:
-            source_info = " (app message)"
-            
-        # Create an embed for the attribution info
-        attribution_embed = discord.Embed(
-            title="Message Forwarded",
-            description=f"A message{source_info} was forwarded from: {message.channel.mention} by {user.mention}"
-        )
-        
-        # Apply styling from embed_config
-        from config import embed_config
-        embed_config.apply_default_styling(attribution_embed)
-        
-        # Create a "Jump to Original" button
+        # Add a Jump to Original button in the channel
         view = discord.ui.View()
         button = discord.ui.Button(
             style=discord.ButtonStyle.link,
@@ -370,14 +291,12 @@ async def handle_reaction_add(reaction, user):
         )
         view.add_item(button)
         
-        # Send the styled embed with button
-        await notification_channel.send(
-            embed=attribution_embed,
-            view=view,
-            allowed_mentions=discord.AllowedMentions.none()
+        # Send only the Jump to Original button without the attribution embed
+        await destination_channel.send(
+            view=view
         )
         
-        logger.info(f"Message from {message.author} forwarded to {notification_channel.name} by {user} using webhook method")
+        logger.info(f"Message from {message.author} forwarded to {destination_channel.name} by {user}")
     except discord.errors.HTTPException as e:
         logger.error(f"Failed to forward message: {str(e)}")
         
@@ -386,9 +305,11 @@ async def handle_reaction_add(reaction, user):
             # Use message.jump_url as a direct link to the original
             embed = discord.Embed(
                 title="Forwarded Message",
-                description=message.content,
-                color=0x5865F2  # Discord blurple
+                description=message.content
             )
+            
+            # Apply styling from embed_config
+            embed = embed_config.apply_default_styling(embed)
             
             # Add author info with source indication
             if message.webhook_id:
@@ -409,41 +330,19 @@ async def handle_reaction_add(reaction, user):
             # Add timestamp
             embed.timestamp = message.created_at
             
-            # Determine source for content message
-            source_info = ""
-            if message.webhook_id:
-                source_info = " (webhook message)"
-            elif message.application_id:
-                source_info = " (app message)"
-                
-            # Create an embed for the fallback attribution info
-            attribution_embed = discord.Embed(
-                title="Message Forwarded (Fallback Mode)",
-                description=f"A message{source_info} was forwarded from: {message.channel.mention} by {user.mention}"
-            )
-            
-            # Apply styling from embed_config
-            embed_config.apply_default_styling(attribution_embed)
-            
-            # Create a "Jump to Original" button
+            # Create a Jump to Original button for fallback
             fallback_view = discord.ui.View()
-            fallback_button = discord.ui.Button(
+            button = discord.ui.Button(
                 style=discord.ButtonStyle.link,
                 label="Jump to Original Message",
                 url=message.jump_url
             )
-            fallback_view.add_item(fallback_button)
-            
-            # Send the styled embed with button
-            await notification_channel.send(
-                embed=attribution_embed,
-                view=fallback_view,
-                allowed_mentions=discord.AllowedMentions.none()
-            )
+            fallback_view.add_item(button)
             
             # Send the original message content in an embed
-            await notification_channel.send(
+            await destination_channel.send(
                 embed=embed,
+                view=fallback_view,
                 allowed_mentions=discord.AllowedMentions.none()
             )
             
@@ -452,9 +351,9 @@ async def handle_reaction_add(reaction, user):
                 for attachment in message.attachments:
                     try:
                         file = await attachment.to_file()
-                        await notification_channel.send(file=file)
+                        await destination_channel.send(file=file)
                     except:
-                        await notification_channel.send(f"[Attachment: {attachment.filename}]({attachment.url})")
+                        await destination_channel.send(f"[Attachment: {attachment.filename}]({attachment.url})")
             
             # Forward embeds if any
             if message.embeds:
@@ -475,7 +374,7 @@ async def handle_reaction_add(reaction, user):
                         for j, field in enumerate(embed.fields):
                             logger.info(f"    - Field #{j+1}: '{field.name}' | Value: '{field.value[:50]}{'...' if len(field.value) > 50 else ''}'")
                     
-                    await notification_channel.send(embed=embed)
+                    await destination_channel.send(embed=embed)
                     logger.info(f"Successfully forwarded embed #{i+1}")
             
             logger.info(f"Used fallback method to forward message from {message.author}")
@@ -491,12 +390,39 @@ def setup_reaction_forward(bot):
     """
     logger.info("Setting up reaction_forward feature")
     
-    # Log the configuration
-    logger.info(f"Reaction forward enabled: {config.ENABLED}")
-    logger.info(f"Message forwarding enabled: {config.ENABLE_FORWARDING}")
-    logger.info(f"Whitelisted categories: {config.CATEGORY_IDS}")
-    logger.info(f"Blacklisted channels: {config.BLACKLIST_CHANNEL_IDS}")
-    logger.info(f"Using notification channel ID: {pinger_config.NOTIFICATION_CHANNEL_ID}")
+    # Get settings directly from settings manager
+    enabled = config.settings_manager.get("ENABLED", False)
+    enable_forwarding = config.settings_manager.get("ENABLE_FORWARDING", False)
+    
+    # Make sure category_ids is a list of integers
+    category_ids_raw = config.settings_manager.get("CATEGORY_IDS", [])
+    category_ids = []
+    for cat_id in category_ids_raw:
+        try:
+            if isinstance(cat_id, str) and cat_id.isdigit():
+                category_ids.append(int(cat_id))
+            elif isinstance(cat_id, int):
+                category_ids.append(cat_id)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid category ID in settings: {cat_id} - {e}")
+    
+    # Store the processed category_ids back to settings
+    config.settings_manager.set("CATEGORY_IDS", category_ids)
+            
+    blacklist_channel_ids = config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
+    destination_channel_id = config.settings_manager.get("DESTINATION_CHANNEL_ID")
+    
+    # Fall back to pinger notification channel if destination channel not set
+    if not destination_channel_id:
+        destination_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+    
+    # Log the configuration with detailed type information
+    logger.info(f"Reaction forward enabled: {enabled}")
+    logger.info(f"Message forwarding enabled: {enable_forwarding}")
+    logger.info(f"Raw category IDs from settings: {category_ids_raw} (type: {type(category_ids_raw).__name__})")
+    logger.info(f"Processed category IDs: {category_ids} (type: {type(category_ids).__name__})")
+    logger.info(f"Blacklisted channels: {blacklist_channel_ids}")
+    logger.info(f"Using destination channel ID: {destination_channel_id}")
     
     # Use listen instead of event to avoid overriding other handlers
     @bot.listen('on_message')

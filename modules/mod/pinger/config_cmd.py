@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 from discord import app_commands
 from config import pinger_config
+from config import embed_config
 
 logger = logging.getLogger('discord_bot.modules.mod.pinger.config_cmd')
 
@@ -138,6 +139,9 @@ async def config_command(interaction, setting=None, value=None):
             ),
             inline=False
         )
+        
+        # Apply default styling
+        embed = embed_config.apply_default_styling(embed)
         
         await interaction.followup.send(embed=embed)
         return

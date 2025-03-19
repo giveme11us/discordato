@@ -1,0 +1,17 @@
+{
+  "luisaviaroma": {
+    "enabled": true,
+    "name": "LUISAVIAROMA",
+    "description": "Extract product IDs from LUISAVIAROMA embeds",
+    "file_path": "/Users/ivansposato/Documents/projects/easycopeu/discord/data/luisaviaroma_drop_urls.txt",
+    "detection": {
+      "type": "author_name",
+      "value": "LUISAVIAROMA"
+    },
+    "extraction": {
+      "primary": "url",
+      "pattern": "\\/[^\\/]+\\/([^\\/]+)$",
+      "fallback": "field_pid"
+    }
+  }
+}

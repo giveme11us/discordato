@@ -1,0 +1,15 @@
+{
+  "ENABLED": true,
+  "CATEGORY_IDS": [
+    811979420461301760
+  ],
+  "BLACKLIST_CHANNEL_IDS": [
+    745420013418315967
+  ],
+  "FORWARD_EMOJI": "\u27a1\ufe0f",
+  "ENABLE_FORWARDING": true,
+  "FORWARD_TITLE": "Forwarded Message",
+  "DESTINATION_CHANNEL_ID": null,
+  "FORWARD_ATTACHMENTS": true,
+  "FORWARD_EMBEDS": true
+}

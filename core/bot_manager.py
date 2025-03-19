@@ -8,13 +8,14 @@ and operational scenario determination.
 import logging
 import discord
 from discord.ext import commands
+import asyncio
 
 from config.environment import get_token, is_development
 from config import settings
 from core.module_loader import ModuleLoader
 from core.command_sync import CommandSync
 from core.command_router import CommandRouter
-from core.command_registry import register_all_commands
+# from core.command_registry import register_all_commands # Disabled old command registry
 
 logger = logging.getLogger('discord_bot.bot_manager')
 
@@ -91,11 +92,10 @@ class BotManager:
             )
             
             # Register all commands centrally
-            register_all_commands(bot)
+            # register_all_commands(bot)
             
-            # Register all modules with this bot
-            for module_name in self.modules:
-                self.module_loader.load_module(bot, module_name)
+            # We'll load modules as cogs in discord_bot.py, so we don't need
+            # the direct module loading here anymore
             
             self.bots['main'] = bot
             
@@ -129,8 +129,7 @@ class BotManager:
                             number = random.randint(min_value, max_value)
                             await interaction.response.send_message(f"🎲 Your random number is: {number}")
                     
-                    # Register only this module with its bot
-                    self.module_loader.load_module(bot, module_name)
+                    # Cogs will be loaded in discord_bot.py
                     
                     self.bots[module_name] = bot
                     logger.info(f"Initialized bot for module {module_name}")
@@ -165,4 +164,65 @@ class BotManager:
         for bot_name, bot in self.bots.items():
             logger.info(f"Stopping bot: {bot_name}")
             # Close the bot
-            bot.close() 
+            bot.close()
+
+    def setup_bot(self, bot_name, token, modules):
+        """
+        Set up and configure a bot with the given name, token, and modules.
+        
+        Args:
+            bot_name: The name of the bot.
+            token: The Discord token for the bot.
+            modules: A list of module names to load for this bot.
+        """
+        intents = discord.Intents.default()
+        intents.message_content = True  # Required for accessing message content
+        
+        # Create the bot instance 
+        bot = commands.Bot(command_prefix=settings.DEFAULT_PREFIX, intents=intents)
+        
+        # Store the bot in our internal registry
+        self.bots[bot_name] = bot
+        
+        # Log modules loaded
+        logger.info(f"Setting up bot: {bot_name} with modules: {modules}")
+        
+        # Load and register all modules for this bot
+        self.module_loader.load_modules(bot, modules)
+        
+        # Register standard commands and features
+        self.command_sync.register_module_commands(bot)
+        
+        # Set up command sync
+        self.command_sync.sync_commands(bot, bot_name)
+        
+        # Start the bot
+        logger.info(f"Starting bot: {bot_name}")
+        return bot 
+
+    def start_bot(self, bot_name):
+        """
+        Start a specific bot.
+        
+        Args:
+            bot_name: The name of the bot to start.
+        """
+        if bot_name not in self.bots:
+            logger.error(f"Bot {bot_name} not found")
+            return False
+        
+        bot = self.bots[bot_name]
+        token = get_token(bot_name)
+        
+        if not token:
+            logger.error(f"No token found for bot {bot_name}")
+            return False
+        
+        try:
+            # Start the bot
+            logger.info(f"Starting bot: {bot_name}")
+            bot.run(token)
+            return True
+        except Exception as e:
+            logger.error(f"Error starting bot {bot_name}: {str(e)}")
+            return False 

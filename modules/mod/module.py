@@ -1,7 +1,10 @@
 """
-Mod Module
+Mod Module (DEPRECATED)
 
 This module provides moderation and general utility commands.
+
+WARNING: This module is deprecated and will be removed in a future version.
+The bot now uses a cog-based architecture. Please use the cogs in the cogs/ directory instead.
 """
 
 import logging
@@ -10,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 logger = logging.getLogger('discord_bot.modules.mod')
+logger.warning("modules/mod/module.py is deprecated and will be removed in a future version. Use cogs instead.")
 
 # Module information
 NAME = "mod"

@@ -1,7 +1,8 @@
 """
-Module Loader
+Module Loader (Legacy)
 
 This module handles the dynamic loading of bot modules.
+It is being phased out in favor of a cog-based architecture.
 """
 
 import os
@@ -15,6 +16,9 @@ logger = logging.getLogger('discord_bot.module_loader')
 class ModuleLoader:
     """
     Handles the discovery and loading of bot modules.
+    
+    NOTE: This class is being phased out in favor of a cog-based architecture.
+    New modules should be implemented as cogs and loaded via bot.load_extension.
     """
     
     def __init__(self):
@@ -23,6 +27,7 @@ class ModuleLoader:
         """
         self.loaded_modules = {}
         self.registered_commands = set()  # Track registered command names
+        logger.warning("ModuleLoader is deprecated and will be removed in future versions. Use cogs instead.")
     
     def discover_modules(self):
         """

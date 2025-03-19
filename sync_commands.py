@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Command Sync Script
+Synchronize slash commands with Discord.
 
-This script manually syncs slash commands to Discord.
+This script connects to Discord and synchronizes 
+the defined slash commands with the Discord API.
 """
 
-import asyncio
-import logging
 import os
-import sys
-from dotenv import load_dotenv
-
 import discord
+import logging
+import dotenv
+import asyncio
+import sys
 from discord.ext import commands
 from discord import app_commands
 
@@ -20,125 +20,185 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger('command_sync')
+logger = logging.getLogger(__name__)
 
-async def sync_commands(bot, guild_id=None):
-    """
-    Sync commands to a specific guild or globally.
-    
-    Args:
-        bot: The Discord bot instance
-        guild_id (int, optional): The guild ID to sync to. If None, syncs globally.
-    """
+# Load environment variables
+dotenv.load_dotenv()
+TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+GUILD_IDS_STR = os.getenv('GUILD_IDS', '')
+logger.info(f"Raw GUILD_IDS: {GUILD_IDS_STR}")
+
+# Parse guild IDs
+GUILD_IDS = []
+if GUILD_IDS_STR:
     try:
-        await bot.wait_until_ready()
-        
-        if guild_id:
-            guild = bot.get_guild(guild_id)
-            if not guild:
-                logger.warning(f"Guild with ID {guild_id} not found")
-                return
-            
-            # Sync to specific guild
-            synced = await bot.tree.sync(guild=guild)
-            logger.info(f"Synced {len(synced)} commands to guild {guild.name} ({guild_id})")
-            for cmd in synced:
-                logger.info(f"  - {cmd.name}: {cmd.description}")
-        else:
-            # Sync globally
-            synced = await bot.tree.sync()
-            logger.info(f"Synced {len(synced)} commands globally")
-            for cmd in synced:
-                logger.info(f"  - {cmd.name}: {cmd.description}")
-            
-        return synced
-    except Exception as e:
-        logger.error(f"Error syncing commands: {str(e)}")
-        return []
+        GUILD_IDS = [int(gid.strip()) for gid in GUILD_IDS_STR.split(',') if gid.strip()]
+        logger.info(f"Parsed guild IDs: {GUILD_IDS}")
+    except ValueError as e:
+        logger.error(f"Error parsing guild IDs: {e}")
 
-def register_commands(bot):
-    """
-    Register all commands from our modules.
-    """
-    # Register ping command
-    @bot.tree.command(name="ping", description="Check if the bot is responsive and view latency")
+# Configure the bot with appropriate intents
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='/', intents=intents)
+
+# Define our custom exit function to be called after syncing
+async def exit_after_sync():
+    # Wait a short time to ensure sync is complete
+    await asyncio.sleep(5)
+    logger.info("Exiting after command sync...")
+    await bot.close()
+    sys.exit(0)
+
+# Event handlers for the bot
+@bot.event
+async def on_ready():
+    logger.info(f"Bot {bot.user.name} is ready")
+    
+    # Define all commands
+    
+    # Basic commands
+    @bot.tree.command(name="ping", description="Sends a simple ping message")
     async def ping(interaction: discord.Interaction):
         await interaction.response.send_message("Pong! 🏓")
         logger.info(f"Ping command executed by {interaction.user}")
-    
-    # Register hi command
-    @bot.tree.command(name="hi", description="Get a friendly greeting from the bot")
+
+    @bot.tree.command(name="hi", description="Says hello")
     async def hi(interaction: discord.Interaction):
-        await interaction.response.send_message(f"Hello there, {interaction.user.display_name}! How are you doing today?")
+        await interaction.response.send_message(f"Hello, {interaction.user.mention}!")
         logger.info(f"Hi command executed by {interaction.user}")
-    
-    # Register number command
-    @bot.tree.command(name="number", description="Generate a random number within a specified range")
-    @app_commands.describe(
-        min_value="The minimum value (default: 1)",
-        max_value="The maximum value (default: 100)"
-    )
-    async def number(interaction: discord.Interaction, min_value: int = 1, max_value: int = 100):
+
+    @bot.tree.command(name="number", description="Generate a random number")
+    @app_commands.describe(min="Minimum value (default: 1)", max="Maximum value (default: 100)")
+    async def number(interaction: discord.Interaction, min: int = 1, max: int = 100):
         import random
-        if min_value >= max_value:
-            await interaction.response.send_message("Error: Minimum value must be less than maximum value.", ephemeral=True)
-            return
-        
-        number = random.randint(min_value, max_value)
-        await interaction.response.send_message(f"🎲 Your random number between {min_value} and {max_value} is: **{number}**")
-        logger.info(f"Number command executed by {interaction.user}")
+        number = random.randint(min, max)
+        await interaction.response.send_message(f"Your random number is: {number}")
+        logger.info(f"Number command executed by {interaction.user} with range {min}-{max}")
     
-    # Register pinger-config command
+    # Pinger config command
     @bot.tree.command(
         name="pinger-config",
         description="Configure the pinger feature"
     )
     @app_commands.describe(
-        setting="The setting to view or modify (channel, whitelist, everyone, here)",
-        value="The new value for the setting"
+        action="The action to perform (add, remove, list)",
+        user="The user to add or remove",
+        role="The role to add or remove"
     )
-    async def pinger_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+    async def pinger_config(
+        interaction: discord.Interaction, 
+        action: str = None, 
+        user: discord.User = None, 
+        role: discord.Role = None
+    ):
         # This is just a placeholder that will be overridden by the actual implementation
         await interaction.response.send_message("Pinger configuration command registered")
         logger.info(f"Pinger-config command executed by {interaction.user}")
     
-    # Register reaction-forward-config command
+    # Reaction forward config command
     @bot.tree.command(
         name="reaction-forward-config",
         description="Configure the reaction forward feature"
     )
     @app_commands.describe(
-        setting="The setting to view or modify (categories, enable, disable, forwarding)",
+        setting="The setting to view or modify (categories, enable, disable, forwarding, blacklist)",
         value="The new value for the setting"
     )
-    async def reaction_forward_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+    async def reaction_forward_config(
+        interaction: discord.Interaction, 
+        setting: str = None, 
+        value: str = None
+    ):
         # This is just a placeholder that will be overridden by the actual implementation
         await interaction.response.send_message("Reaction forward configuration command registered")
         logger.info(f"Reaction-forward-config command executed by {interaction.user}")
     
-    # Register link-reaction-config command
+    # Link reaction config command
     @bot.tree.command(
         name="link-reaction-config",
-        description="Configure the link reaction feature"
+        description="Configure the link reaction feature and manage store settings"
     )
     @app_commands.describe(
-        setting="The setting to view or modify (enabled, categories, blacklist)",
+        action="The action to perform (view, enable, disable, categories, blacklist, stores)",
+        store_id="The store ID to configure (for stores action)",
+        setting="The setting to modify for the selected store or feature",
         value="The new value for the setting"
     )
-    async def link_reaction_config(interaction: discord.Interaction, setting: str = None, value: str = None):
+    async def link_reaction_config(
+        interaction: discord.Interaction, 
+        action: str = "view",
+        store_id: str = None,
+        setting: str = None,
+        value: str = None
+    ):
         # This is just a placeholder that will be overridden by the actual implementation
         await interaction.response.send_message("Link reaction configuration command registered")
         logger.info(f"Link-reaction-config command executed by {interaction.user}")
     
-    # Register mod-config command
+    # Keyword filter config command
     @bot.tree.command(
-        name="mod-config",
-        description="Configure module-wide settings"
+        name="keyword-filter-config",
+        description="Configure the keyword filter feature"
     )
     @app_commands.describe(
-        setting="The setting to view or modify (whitelist)",
+        action="The action to perform (view, enable, disable, categories, blacklist, filters, dry_run)",
+        filter_id="The filter ID to configure (for filters action)",
+        setting="The setting to modify for the selected filter or feature",
+        value="The new value for the setting"
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="View Configuration", value="view"),
+            app_commands.Choice(name="Enable Feature", value="enable"),
+            app_commands.Choice(name="Disable Feature", value="disable"),
+            app_commands.Choice(name="Manage Categories", value="categories"),
+            app_commands.Choice(name="Manage Blacklist", value="blacklist"),
+            app_commands.Choice(name="Configure Notifications", value="notification"),
+            app_commands.Choice(name="Toggle Dry Run Mode", value="dry_run"),
+            app_commands.Choice(name="Manage Filters", value="filters")
+        ]
+    )
+    async def keyword_filter_config(
+        interaction: discord.Interaction, 
+        action: str = "view",
+        filter_id: str = None,
+        setting: str = None,
+        value: str = None
+    ):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Keyword filter configuration command registered")
+        logger.info(f"Keyword-filter-config command executed by {interaction.user}")
+    
+    # Keyword filter quicksetup command
+    @bot.tree.command(
+        name="keyword-filter-quicksetup",
+        description="Quick setup for keyword filter with a single command"
+    )
+    @app_commands.describe(
+        source_channel="The channel or category ID to monitor for keywords",
+        notification_channel="The channel ID where notifications will be sent",
+        keywords="Comma-separated list of keywords to filter (e.g., 'test,hello,example')"
+    )
+    async def keyword_filter_quicksetup(
+        interaction: discord.Interaction,
+        source_channel: str,
+        notification_channel: str,
+        keywords: str
+    ):
+        # This is just a placeholder that will be overridden by the actual implementation
+        await interaction.response.send_message("Keyword filter quicksetup command registered")
+        logger.info(f"Keyword-filter-quicksetup command executed by {interaction.user}")
+    
+    # Mod config command
+    @bot.tree.command(
+        name="mod-config",
+        description="Configure moderation settings"
+    )
+    @app_commands.describe(
+        setting="The setting to configure (whitelist)",
         action="The action to perform (add, remove, clear, view)",
-        value="The value for the action (role mention or ID)"
+        value="The value for the action (role ID or mention)"
     )
     async def mod_config(
         interaction: discord.Interaction, 
@@ -147,99 +207,47 @@ def register_commands(bot):
         value: str = None
     ):
         # This is just a placeholder that will be overridden by the actual implementation
-        await interaction.response.send_message("Module configuration command registered")
+        await interaction.response.send_message("Mod configuration command registered")
         logger.info(f"Mod-config command executed by {interaction.user}")
     
-    # Register purge command
+    # Purge command
     @bot.tree.command(
         name="purge",
-        description="Delete a specified number of messages in the current channel"
+        description="Delete a specified number of messages from the channel"
     )
     @app_commands.describe(
-        count="The number of messages to delete (max 100)"
+        limit="The number of messages to delete (1-100)"
     )
     async def purge(
         interaction: discord.Interaction, 
-        count: int
+        limit: int = 10
     ):
         # This is just a placeholder that will be overridden by the actual implementation
-        await interaction.response.send_message("Purge command registered")
+        await interaction.response.send_message(f"Purge command registered (limit: {limit})")
         logger.info(f"Purge command executed by {interaction.user}")
     
-    logger.info("Registered all commands")
-
-async def main():
-    # Load environment variables
-    load_dotenv()
+    # Log the total number of commands registered
+    logger.info(f"Registered {len(bot.tree.get_commands())} commands")
     
-    # Get Discord token
-    token = os.getenv('DISCORD_BOT_TOKEN')
-    if not token:
-        logger.error("No Discord token found. Set DISCORD_BOT_TOKEN in .env file.")
-        return
+    # Sync commands with guild(s)
+    for guild_id in GUILD_IDS:
+        try:
+            guild = bot.get_guild(guild_id)
+            if guild:
+                await bot.tree.sync(guild=guild)
+                logger.info(f"Synced {len(bot.tree.get_commands())} commands to guild: {guild.name} ({guild_id})")
+            else:
+                logger.warning(f"Guild not found: {guild_id}")
+        except Exception as e:
+            logger.error(f"Error syncing commands to guild {guild_id}: {e}")
     
-    # Get guild IDs - handle more robustly
-    guild_ids_str = os.getenv('GUILD_IDS', '')
-    guild_ids = []
-    
-    # Log the raw value for debugging
-    logger.info(f"Raw GUILD_IDS from .env: '{guild_ids_str}'")
-    
-    # Handle different potential formats
-    if guild_ids_str:
-        if ',' in guild_ids_str:
-            # Handle comma-separated list
-            for id_str in guild_ids_str.split(','):
-                if id_str.strip():
-                    try:
-                        guild_ids.append(int(id_str.strip()))
-                    except ValueError:
-                        logger.error(f"Invalid guild ID format: {id_str}")
-        else:
-            # Handle single value
-            try:
-                if guild_ids_str.strip():
-                    guild_ids.append(int(guild_ids_str.strip()))
-            except ValueError:
-                logger.error(f"Invalid guild ID format: {guild_ids_str}")
-    
-    logger.info(f"Parsed GUILD_IDS: {guild_ids}")
-    
-    # Create bot instance with necessary intents
-    intents = discord.Intents.default()
-    intents.message_content = True
-    bot = commands.Bot(command_prefix='/', intents=intents)
-    
-    # Register all commands
-    register_commands(bot)
-    
-    @bot.event
-    async def on_ready():
-        logger.info(f"Bot {bot.user.name} is ready")
-        
-        # Log all registered commands
-        cmds = bot.tree.get_commands()
-        logger.info(f"Bot has {len(cmds)} commands registered")
-        for cmd in cmds:
-            logger.info(f"  - Command: {cmd.name}")
-        
-        # Sync to specific guilds
-        if guild_ids:
-            for guild_id in guild_ids:
-                logger.info(f"Syncing commands to guild ID: {guild_id}")
-                await sync_commands(bot, guild_id)
-        else:
-            # Sync globally
-            logger.info("No guild IDs found, syncing globally")
-            await sync_commands(bot)
-        
-        # Disconnect after syncing
-        await bot.close()
-    
-    try:
-        await bot.start(token)
-    except Exception as e:
-        logger.error(f"Error starting bot: {str(e)}")
+    # Schedule the exit after sync
+    bot.loop.create_task(exit_after_sync())
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        logger.info("Starting bot...")
+        bot.run(TOKEN)
+    except Exception as e:
+        logger.error(f"Error running bot: {e}")
+        sys.exit(1) 

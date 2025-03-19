@@ -69,7 +69,7 @@ async def handle_mod_config(interaction, setting=None, action=None, value=None):
         embed = discord.Embed(
             title="Mod Module Configuration",
             description="Current module-wide settings",
-            color=int(embed_config.COLOR, 16) if hasattr(embed_config, 'COLOR') else 0x000000
+            color=discord.Color.blue()
         )
         
         # Format the whitelist role IDs
@@ -94,9 +94,8 @@ async def handle_mod_config(interaction, setting=None, action=None, value=None):
             inline=False
         )
         
-        # Set footer
-        if hasattr(embed_config, 'FOOTER_TEXT'):
-            embed.set_footer(text=embed_config.FOOTER_TEXT)
+        # Apply default styling
+        embed = embed_config.apply_default_styling(embed)
         
         await interaction.response.send_message(embed=embed)
         return

@@ -97,20 +97,20 @@ async def handle_reaction_forward_config(interaction, setting=None, value=None):
         embed = discord.Embed(
             title="Reaction Forward Configuration",
             description="Current settings for the reaction forward feature",
-            color=int(embed_config.COLOR, 16) if hasattr(embed_config, 'COLOR') else 0x005aeb
+            color=discord.Color.blue()
         )
         
         # Add fields for each setting
         embed.add_field(
             name="Enabled",
-            value=str(config.ENABLED),
+            value="✅ Yes" if config.ENABLED else "❌ No",
             inline=False
         )
         
         # Add field for forwarding feature
         embed.add_field(
             name="Message Forwarding",
-            value=str(config.ENABLE_FORWARDING),
+            value="✅ Yes" if config.ENABLE_FORWARDING else "❌ No",
             inline=False
         )
         
@@ -161,9 +161,8 @@ async def handle_reaction_forward_config(interaction, setting=None, value=None):
             inline=False
         )
         
-        # Set footer
-        if hasattr(embed_config, 'FOOTER_TEXT'):
-            embed.set_footer(text=embed_config.FOOTER_TEXT)
+        # Apply default styling instead of manually setting footer
+        embed = embed_config.apply_default_styling(embed)
         
         # Add buttons for quick actions
         view = ReactionForwardConfigView()

@@ -19,6 +19,15 @@ A modular Discord bot system capable of managing multiple functional modules wit
 - **Link Reaction System**: Automatically adds a 🔗 link emoji to messages containing embeds from supported stores (like LUISAVIAROMA) in specified category channels. The bot will only add the reaction if it detects content from supported stores, optimizing the user experience by only highlighting relevant content.
   - **Store Product ID Extraction**: When whitelisted users react with the 🔗 link emoji to embeds from specific stores, the bot extracts product IDs and saves them to configured files:
     - **LUISAVIAROMA**: Extracts product IDs from embeds with author "LUISAVIAROMA" and saves them to a file specified in the `luisaviaroma_drops_urls_path` environment variable.
+- **Keyword Filter System**: Automatically monitors messages in specified categories for problematic content using regex patterns.
+  - **Pattern Detection**: Uses regular expressions to match against potential threats and unwanted content
+  - **Configurable Actions**: Each filter can be set to log, notify, or delete matching messages
+  - **Severity Levels**: Categorize threats as low, medium, or high severity
+  - **Detailed Notifications**: Sends comprehensive reports to a notification channel with message details and context
+  - **Dry Run Mode**: Test filters without deletion actions to ensure proper configuration
+  - **Preset Filters**: Comes with preconfigured filters for common threats like Discord scam links and invite links
+  - **Pattern Management**: Add, remove, or modify patterns through slash commands
+  - **Category/Channel Control**: Apply filtering only to specific categories with the ability to blacklist channels
 
 ## Project Structure
 
@@ -32,9 +41,13 @@ discord_bot_project/
 │   ├── bot_manager.py        # Bot initialization and lifecycle manager
 │   ├── command_sync.py       # Handles Discord slash command registration
 │   ├── command_router.py     # Routes commands to appropriate modules
-│   ├── module_loader.py      # Dynamically loads modules
 │   └── command_registry.py   # Central registry for all commands
-├── modules/                  # Functional modules
+├── cogs/                     # Discord.py cogs (extension modules)
+│   ├── keyword_filter_cog.py # Keyword filtering functionality
+│   ├── link_reaction_cog.py  # Link reaction functionality
+│   ├── reaction_forward_cog.py # Reaction forward functionality
+│   └── pinger_cog.py         # Ping notification functionality
+├── modules/                  # Functional modules (legacy architecture)
 │   ├── mod/                  # Moderation module
 │   ├── online/               # Online interaction module
 │   └── instore/              # In-store interaction module
