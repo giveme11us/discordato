@@ -1,0 +1,11 @@
+{
+    "ENABLED": false,
+    "MONITOR_EVERYONE": true,
+    "MONITOR_HERE": true,
+    "MONITOR_ROLES": true,
+    "NOTIFICATION_CHANNEL_ID": null,
+    "WHITELIST_ROLE_IDS": [],
+    "BLACKLIST_CHANNEL_IDS": [],
+    "CATEGORY_IDS": [],
+    "version": "1.0.0"
+}

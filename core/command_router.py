@@ -6,7 +6,7 @@ This module handles routing commands to the appropriate module handlers.
 
 import logging
 from discord.ext import commands
-from config import settings
+from config.core.settings import settings
 
 logger = logging.getLogger('discord_bot.command_router')
 

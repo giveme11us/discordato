@@ -9,7 +9,8 @@ import os
 import importlib
 import logging
 import inspect
-from config import settings
+from config.core.settings import settings
+from config.core.settings_manager import get_manager
 
 logger = logging.getLogger('discord_bot.module_loader')
 
@@ -89,7 +90,6 @@ class ModuleLoader:
                         logger.error(f"Could not import {module_name}_config, will create a minimal version: {e}")
                         
                         # Create a minimal config module dynamically if it doesn't exist
-                        from config.settings_manager import get_manager
                         # Define minimal default config
                         DEFAULT_CONFIG = {
                             "ENABLED": False,

@@ -7,7 +7,7 @@ This cog integrates the reaction forward module with the Discord bot.
 import discord
 from discord.ext import commands
 import logging
-from modules.mod.reaction_forward import setup_reaction_forward
+from modules.features.mod.reaction_forward import setup_reaction_forward
 
 logger = logging.getLogger('discord_bot.cogs.reaction_forward_cog')
 

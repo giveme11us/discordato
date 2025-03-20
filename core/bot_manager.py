@@ -10,8 +10,8 @@ import discord
 from discord.ext import commands
 import asyncio
 
-from config.environment import get_token, is_development
-from config import settings
+from config.environment.environment import get_token, is_development
+from config.core.settings import settings
 from core.module_loader import ModuleLoader
 from core.command_sync import CommandSync
 from core.command_router import CommandRouter

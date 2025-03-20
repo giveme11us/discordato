@@ -1,0 +1,25 @@
+{
+    "ENABLED": false,
+    "LINK_EMOJI": "\ud83d\udd17",
+    "STORES": {
+        "luisaviaroma": {
+            "enabled": true,
+            "emoji": "\ud83d\udc55",
+            "category_ids": [],
+            "blacklist_channel_ids": []
+        },
+        "ssense": {
+            "enabled": true,
+            "emoji": "\ud83d\udc54",
+            "category_ids": [],
+            "blacklist_channel_ids": []
+        },
+        "farfetch": {
+            "enabled": true,
+            "emoji": "\ud83d\udc57",
+            "category_ids": [],
+            "blacklist_channel_ids": []
+        }
+    },
+    "version": "1.0.0"
+}

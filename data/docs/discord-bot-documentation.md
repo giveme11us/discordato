@@ -19,53 +19,48 @@ discord_bot_project/
 ├── .env                      # Environment variables file
 ├── config/
 │   ├── __init__.py
-│   ├── settings.py           # General configuration settings
-│   └── environment.py        # Environment variables loader
-│
-├── core/
-│   ├── __init__.py
-│   ├── bot_manager.py        # Bot initialization and lifecycle manager
-│   ├── command_sync.py       # Handles Discord slash command registration
-│   ├── command_router.py     # Routes commands to appropriate modules
-│   └── module_loader.py      # Dynamically loads modules
+│   ├── core/                # Core configuration
+│   │   ├── __init__.py
+│   │   ├── settings.py      # General configuration settings
+│   │   └── environment.py   # Environment variables loader
+│   └── features/            # Feature-specific configuration
+│       ├── __init__.py
+│       ├── moderation.py    # Moderation settings
+│       ├── reactions.py     # Reaction settings
+│       ├── redeye_config.py # Redeye module settings
+│       ├── embed_config.py  # Embed settings
+│       ├── global_whitelist.py # Whitelist settings
+│       └── pinger_config.py # Pinger settings
 │
 ├── modules/
 │   ├── __init__.py
-│   │
-│   ├── mod/
+│   ├── core/               # Core functionality
 │   │   ├── __init__.py
-│   │   ├── module.py         # Module definition and configuration
-│   │   ├── general/
-│   │   │   ├── __init__.py
-│   │   │   ├── ping.py       # /ping command implementation
-│   │   │   └── command2.py   # /command2 implementation
-│   │   └── feature2/
-│   │       ├── __init__.py
-│   │       ├── command3.py   # /command3 implementation
-│   │       └── command4.py   # /command4 implementation
+│   │   ├── bot_manager.py  # Bot initialization and lifecycle manager
+│   │   ├── command_sync.py # Handles Discord slash command registration
+│   │   ├── command_router.py # Routes commands to appropriate modules
+│   │   └── module_loader.py # Dynamically loads modules
 │   │
-│   ├── online/
-│   │   ├── __init__.py
-│   │   ├── module.py         # Module definition and configuration
-│   │   ├── hi.py             # /hi command implementation
-│   │   ├── example.py        # /example command implementation
-│   │   ├── command4.py       # /command4 implementation
-│   │   └── command5.py       # /command5 implementation
-│   │
-│   └── instore/
+│   └── features/           # Feature modules
 │       ├── __init__.py
-│       ├── module.py         # Module definition and configuration
-│       ├── number.py         # /number command implementation
-│       ├── example2.py       # /example2 command implementation
-│       └── example3.py       # /example3 command implementation
+│       ├── keyword_filter/ # Keyword filtering functionality
+│       ├── link_reaction/  # Link reaction handling
+│       ├── reaction_forward/ # Message forwarding
+│       ├── pinger/        # Mention monitoring
+│       └── redeye/        # Redeye functionality
 │
 ├── utils/
 │   ├── __init__.py
-│   ├── logger.py             # Logging functionality
-│   └── helpers.py            # Common helper functions
+│   ├── logger.py          # Logging functionality
+│   └── helpers.py         # Common helper functions
 │
-└── tests/                    # Test files
+├── tools/                 # Development and maintenance tools
+│   ├── code_formatters/   # Code formatting utilities
+│   └── debug/            # Debugging tools
+│
+└── tests/                # Test files
     ├── __init__.py
+    ├── data/            # Test data files
     ├── test_bot_manager.py
     ├── test_modules.py
     └── test_commands.py

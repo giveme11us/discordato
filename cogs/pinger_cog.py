@@ -7,7 +7,7 @@ This cog integrates the pinger module with the Discord bot.
 import discord
 from discord.ext import commands
 import logging
-from modules.mod.pinger.pinger import setup_pinger
+from modules.features.mod.pinger.pinger import setup_pinger
 
 logger = logging.getLogger('discord_bot.cogs.pinger_cog')
 

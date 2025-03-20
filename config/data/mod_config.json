@@ -1,0 +1,15 @@
+{
+    "ENABLED": false,
+    "WHITELIST_ROLE_IDS": [],
+    "BLACKLIST_ROLE_IDS": [],
+    "MOD_CHANNEL_IDS": [],
+    "LOG_CHANNEL_ID": null,
+    "AUTO_MOD_ENABLED": false,
+    "AUTO_MOD_RULES": {
+        "spam": true,
+        "links": true,
+        "caps": true,
+        "mentions": true
+    },
+    "version": "1.0.0"
+}

@@ -1,0 +1,27 @@
+{
+    "ENABLED": false,
+    "PROFILES_PATH": "data/redeye/profiles.csv",
+    "TASKS_PATH": "data/redeye/tasks.csv",
+    "DEFAULT_PROFILE": {
+        "name": "default",
+        "description": "Default profile",
+        "settings": {
+            "enabled": true,
+            "notify": true,
+            "auto_respond": false
+        }
+    },
+    "TASK_TYPES": {
+        "check": {
+            "enabled": true,
+            "interval": 300,
+            "timeout": 30
+        },
+        "update": {
+            "enabled": true,
+            "interval": 3600,
+            "timeout": 60
+        }
+    },
+    "version": "1.0.0"
+}

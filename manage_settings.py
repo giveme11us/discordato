@@ -17,6 +17,7 @@ import argparse
 import logging
 from dotenv import load_dotenv
 from typing import Dict, Any, List
+from config.features.moderation import filter as keyword_filter_config
 
 # Setup logging
 logging.basicConfig(
@@ -162,7 +163,6 @@ def validate_settings() -> None:
     """
     try:
         # Import config modules to use their default settings as schema
-        import config.keyword_filter_config as keyword_filter_config
         import config.link_reaction_config as link_reaction_config
         import config.reaction_forward_config as reaction_forward_config
         import config.pinger_config as pinger_config

@@ -9,11 +9,11 @@ from discord.ext import commands
 import logging
 
 # Import module-specific configuration commands
-from modules.mod.pinger.config_cmd import setup_config_cmd as setup_pinger_config
-from modules.mod.reaction_forward.config_cmd import setup_config_cmd as setup_reaction_forward_config
-from modules.mod.link_reaction.config_cmd import link_reaction_config
-from modules.mod.keyword_filter.config_cmd import keyword_filter_config, keyword_filter_quicksetup
-from modules.mod.mod_config_cmd import setup_config_cmd as setup_mod_config
+from modules.features.mod.pinger.config_cmd import setup_config_cmd as setup_pinger_config
+from modules.features.mod.reaction_forward.config_cmd import setup_config_cmd as setup_reaction_forward_config
+from modules.features.mod.link_reaction.config_cmd import link_reaction_config
+from modules.features.mod.keyword_filter.config_cmd import keyword_filter_config, keyword_filter_quicksetup
+from modules.features.mod.mod_config_cmd import setup_config_cmd as setup_mod_config
 
 logger = logging.getLogger('discord_bot.cogs.config_cog')
 

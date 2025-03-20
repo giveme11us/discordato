@@ -1,0 +1,26 @@
+{
+    "ENABLED": false,
+    "CATEGORY_IDS": [],
+    "BLACKLIST_CHANNEL_IDS": [],
+    "FILTERS": {
+        "spam": {
+            "enabled": true,
+            "patterns": [],
+            "action": "delete",
+            "notify": true
+        },
+        "links": {
+            "enabled": true,
+            "patterns": [],
+            "action": "delete",
+            "notify": true
+        },
+        "caps": {
+            "enabled": true,
+            "threshold": 0.7,
+            "action": "warn",
+            "notify": true
+        }
+    },
+    "version": "1.0.0"
+}

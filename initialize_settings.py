@@ -17,20 +17,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('initialize_settings')
 
 # Import default configurations
-from config.keyword_filter_config import DEFAULT_CONFIG as KEYWORD_FILTER_DEFAULT
+from config.features.moderation import filter as keyword_filter_config
 from config.link_reaction_config import DEFAULT_CONFIG as LINK_REACTION_DEFAULT
 from config.reaction_forward_config import DEFAULT_CONFIG as REACTION_FORWARD_DEFAULT
-from config.pinger_config import DEFAULT_CONFIG as PINGER_DEFAULT
+from config.features.pinger_config import pinger
 
 # Settings directory
 SETTINGS_DIR = os.path.join('data', 'settings')
 
 # Module settings to initialize
 MODULE_SETTINGS = {
-    'keyword_filter': KEYWORD_FILTER_DEFAULT,
+    'keyword_filter': keyword_filter_config,
     'link_reaction': LINK_REACTION_DEFAULT,
     'reaction_forward': REACTION_FORWARD_DEFAULT,
-    'pinger': PINGER_DEFAULT
+    'pinger': pinger.DEFAULT_CONFIG
 }
 
 def initialize_settings():

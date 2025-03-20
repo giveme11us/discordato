@@ -2,18 +2,26 @@
 
 ## Overview
 
-The bot's configuration system has been redesigned to better separate core environment variables from user-configurable settings. This migration moves all user-configurable settings to JSON files, making it easier to manage and modify configurations.
+The bot's configuration system has been redesigned to better separate core environment variables from user-configurable settings. This migration moves all user-configurable settings to a structured configuration system with clear separation between core and feature-specific settings.
 
 ## Changes
 
 1. **New Configuration Structure**
    - **Environment Variables** (`.env`): Core settings like tokens and IDs
-   - **Settings Files** (`data/settings/*.json`): User-configurable settings
+   - **Core Configuration** (`config/core/`): Essential bot settings
+   - **Feature Configuration** (`config/features/`): Module-specific settings
 
-2. **Centralized Settings Manager**
-   - All configuration is now managed through a central `settings_manager.py` module
-   - Each module has its own settings file (e.g., `keyword_filter.json`)
-   - Settings are automatically loaded and saved
+2. **Configuration Organization**
+   - Core settings in `config/core/`
+     - `settings.py`: General configuration settings
+     - `environment.py`: Environment variables loader
+   - Feature settings in `config/features/`
+     - `moderation.py`: Moderation settings
+     - `reactions.py`: Reaction settings
+     - `redeye_config.py`: Redeye module settings
+     - `embed_config.py`: Embed settings
+     - `global_whitelist.py`: Whitelist settings
+     - `pinger_config.py`: Pinger settings
 
 3. **Improved Type Safety**
    - Configuration values are accessed through Python properties
@@ -28,8 +36,8 @@ The bot's configuration system has been redesigned to better separate core envir
 ## Migration Benefits
 
 1. **Cleaner Configuration**
-   - No more mix of environment variables and JSON files
-   - Each module has a clearly defined set of settings
+   - Clear separation between core and feature settings
+   - Each feature has its own configuration file
    - Settings are stored in a consistent format
 
 2. **Easier to Manage**
@@ -44,14 +52,16 @@ The bot's configuration system has been redesigned to better separate core envir
 
 ## Module Configurations
 
-The following modules now have their own configuration files:
+The following modules now have their own configuration files in `config/features/`:
 
 | Module | Settings File | Description |
 |--------|---------------|-------------|
-| Keyword Filter | `keyword_filter.json` | Message filtering settings |
-| Link Reaction | `link_reaction.json` | Link reaction settings and store rules |
-| Reaction Forward | `reaction_forward.json` | Message forwarding settings |
-| Pinger | `pinger.json` | Mention monitoring settings |
+| Moderation | `moderation.py` | Moderation settings and rules |
+| Reactions | `reactions.py` | Reaction handling settings |
+| Redeye | `redeye_config.py` | Redeye module settings |
+| Embed | `embed_config.py` | Message embed settings |
+| Whitelist | `global_whitelist.py` | Global whitelist settings |
+| Pinger | `pinger_config.py` | Mention monitoring settings |
 
 ## Updating Commands
 
@@ -88,10 +98,8 @@ python cleanup.py
 ## Migration Checklist
 
 - [x] Create centralized settings manager
-- [x] Update keyword filter configuration
-- [x] Update link reaction configuration
-- [x] Update reaction forward configuration
-- [x] Update pinger configuration
+- [x] Update core configuration structure
+- [x] Update feature configuration structure
 - [x] Create migration and management tools
 - [x] Document new configuration system
 - [ ] Clean up deprecated configuration files

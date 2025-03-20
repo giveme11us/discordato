@@ -8,8 +8,14 @@ import logging
 import discord
 import asyncio
 from discord import app_commands
-from config import settings
-from config.environment import is_development
+from config.core.settings import settings
+from config.environment.environment import is_development
+from config.features.moderation import filter as filter_config, mod as mod_config
+from config.features.reactions import forward as forward_config, link as link_config
+from config.features.pinger_config import pinger_config
+from config.features.redeye_config import redeye as redeye_config
+from config.features.embed_config import embed as embed_config
+from modules.features.mod.link_reaction.remover import remove_pid_from_file
 
 logger = logging.getLogger('discord_bot.command_sync')
 
@@ -124,43 +130,37 @@ class CommandSync:
             async def general(interaction: discord.Interaction):
                 """Show bot status and configuration for all modules"""
                 
-                # Import configuration modules
-                from config import keyword_filter_config
-                from config import reaction_forward_config
-                from config import pinger_config
-                from config import link_reaction_config
-                from config import embed_config
-                
                 # Get raw values directly from settings managers
                 # Keyword Filter config values
-                kf_enabled = keyword_filter_config.settings_manager.get("ENABLED", False)
-                kf_category_ids = keyword_filter_config.settings_manager.get("CATEGORY_IDS", [])
-                kf_blacklist_ids = keyword_filter_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-                kf_filters = keyword_filter_config.settings_manager.get("FILTERS", {})
-                kf_whitelist_role_ids = keyword_filter_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+                kf_enabled = filter_config.ENABLED
+                kf_category_ids = filter_config.CATEGORY_IDS
+                kf_blacklist_ids = filter_config.BLACKLIST_CHANNEL_IDS
+                kf_filters = filter_config.FILTERS
+                kf_whitelist_role_ids = mod_config.WHITELIST_ROLE_IDS
                 
                 # Reaction Forward config values
-                rf_enabled = reaction_forward_config.settings_manager.get("ENABLED", False)
-                rf_category_ids = reaction_forward_config.settings_manager.get("CATEGORY_IDS", [])
-                rf_blacklist_ids = reaction_forward_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-                rf_whitelist_role_ids = reaction_forward_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
-                rf_destination_channel_id = reaction_forward_config.settings_manager.get("DESTINATION_CHANNEL_ID")
+                rf_enabled = forward_config.ENABLED
+                rf_category_ids = forward_config.CATEGORY_IDS
+                rf_blacklist_ids = forward_config.BLACKLIST_CHANNEL_IDS
+                rf_whitelist_role_ids = forward_config.WHITELIST_ROLE_IDS
+                rf_destination_channel_id = forward_config.DESTINATION_CHANNEL_ID
                 
                 # Pinger config values
-                pn_enabled = pinger_config.settings_manager.get("ENABLED", False)
-                pn_monitor_everyone = pinger_config.settings_manager.get("MONITOR_EVERYONE", False)
-                pn_monitor_here = pinger_config.settings_manager.get("MONITOR_HERE", False)
-                pn_monitor_roles = pinger_config.settings_manager.get("MONITOR_ROLES", False)
-                pn_notif_channel_id = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
-                pn_whitelist_role_ids = pinger_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+                pn_enabled = pinger_config.ENABLED
+                pn_monitor_everyone = pinger_config.MONITOR_EVERYONE
+                pn_monitor_here = pinger_config.MONITOR_HERE
+                pn_monitor_roles = pinger_config.MONITOR_ROLES
+                pn_notif_channel_id = pinger_config.NOTIFICATION_CHANNEL_ID
+                pn_whitelist_role_ids = pinger_config.WHITELIST_ROLE_IDS
                 
                 # Get LuisaViaRoma settings
-                stores = link_reaction_config.settings_manager.get("STORES", [])
+                stores = link_config.STORES
                 luisaviaroma_store = None
-                for store in stores:
-                    if isinstance(store, dict) and store.get('name', '').lower() == 'luisaviaroma':
-                        luisaviaroma_store = store
-                        break
+                if isinstance(stores, dict):
+                    for store_id, store in stores.items():
+                        if store.get('name', '').lower() == 'luisaviaroma':
+                            luisaviaroma_store = store
+                            break
                 
                 # Create embed for better formatting
                 embed = discord.Embed(
@@ -183,9 +183,10 @@ class CommandSync:
                 
                 # Format active filters/rules info
                 active_rules = []
-                for rule_id, rule in kf_filters.items():
-                    if rule.get('enabled', False):
-                        active_rules.append(f"• **{rule.get('name', rule_id)}** ({len(rule.get('keywords', []))} keywords)")
+                if isinstance(kf_filters, dict):
+                    for rule_id, rule in kf_filters.items():
+                        if isinstance(rule, dict) and rule.get('enabled', False):
+                            active_rules.append(f"• **{rule.get('name', rule_id)}** ({len(rule.get('keywords', []))} keywords)")
                 
                 embed.add_field(
                     name="📝 Keyword Filter", 
@@ -249,63 +250,37 @@ class CommandSync:
                     monitored.append("❌ @here")
                 
                 if pn_monitor_roles:
-                    monitored.append("✅ @role mentions")
+                    monitored.append("✅ @roles")
                 else:
-                    monitored.append("❌ @role mentions")
-                
-                # Format notification channel
-                notification_channel = None
-                if pn_notif_channel_id:
-                    notification_channel = discord.utils.get(interaction.guild.channels, id=pn_notif_channel_id)
+                    monitored.append("❌ @roles")
                 
                 embed.add_field(
-                    name="🔔 Mention Pinger", 
+                    name="🔔 Pinger", 
                     value=f"**Status**: {pinger_status}", 
                     inline=True
                 )
                 
                 embed.add_field(
-                    name="Monitoring", 
-                    value=f"{'✅' if pn_monitor_everyone else '❌'} @everyone\n{'✅' if pn_monitor_here else '❌'} @here\n{'✅' if pn_monitor_roles else '❌'} @roles", 
+                    name="Monitored Mentions", 
+                    value="\n".join(monitored), 
                     inline=True
                 )
                 
                 embed.add_field(
-                    name="Channel", 
-                    value=f"{f'#{notification_channel.name}' if notification_channel else 'Not set'}\n`/pinger` to configure", 
+                    name="Notification Channel", 
+                    value=f"{f'#{discord.utils.get(interaction.guild.channels, id=pn_notif_channel_id).name}' if pn_notif_channel_id else 'Not set'}\n`/pinger` to configure", 
                     inline=True
                 )
                 
-                # Add LuisaViaRoma config in a compact format
+                # Add LuisaViaRoma config if available
                 if luisaviaroma_store:
-                    # Format status
-                    lv_status = "✅ Active" if luisaviaroma_store.get('enabled', False) else "❌ Inactive"
-                    
+                    lvr_status = "✅ Active" if luisaviaroma_store.get('enabled', False) else "❌ Inactive"
                     embed.add_field(
-                        name="🛍️ LuisaViaRoma Adder", 
-                        value=f"**Status**: {lv_status}", 
-                        inline=True
-                    )
-                    
-                    embed.add_field(
-                        name="Monitored", 
-                        value=f"Channels: **{len(luisaviaroma_store.get('channel_ids', []))}**\nEmoji: **{luisaviaroma_store.get('emoji', '🔗')}**", 
-                        inline=True
-                    )
-                    
-                    file_path = luisaviaroma_store.get('file_path', 'Not configured')
-                    # Shorten file path if too long
-                    if len(file_path) > 25:
-                        file_parts = file_path.split('/')
-                        file_path = f".../{file_parts[-2]}/{file_parts[-1]}"
-                    
-                    embed.add_field(
-                        name="File Path", 
-                        value=f"`{file_path}`\n`/luisaviaroma_adder` to configure", 
+                        name="🛍️ LuisaViaRoma", 
+                        value=f"**Status**: {lvr_status}\n`/reaction` to configure", 
                         inline=True
                     )
                 
-                # Send as ephemeral message (only visible to command user)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
             
             # Register ping command
@@ -328,13 +303,13 @@ class CommandSync:
                 rule_delete: str = None  # Name of rule to delete (renamed from delete)
             ):
                 # Import configuration
-                from config import keyword_filter_config
+                from config import filter_config
                 from config import embed_config
                 
                 # Only allow administrators to use this command
                 
                 # Get settings directly from the settings manager
-                settings = keyword_filter_config.settings_manager
+                settings = filter_config.ENABLED
                 
                 # Get current configuration values
                 kf_enabled = settings.get("ENABLED", False)
@@ -353,7 +328,7 @@ class CommandSync:
                     if rule_id in rules:
                         del rules[rule_id]
                         settings.set("RULES", rules)
-                        keyword_filter_config.settings_manager.save_settings()
+                        filter_config.ENABLED.save_settings()
                         logger.info(f"Rule {rule_id} deleted successfully")
                         await interaction.followup.send(f"✅ Keyword rule '{rule_delete}' deleted successfully!")
                         return
@@ -364,7 +339,7 @@ class CommandSync:
                                 logger.debug(f"Found rule with case-insensitive match: {existing_rule_id}")
                                 del rules[existing_rule_id]
                                 settings.set("RULES", rules)
-                                keyword_filter_config.settings_manager.save_settings()
+                                filter_config.ENABLED.save_settings()
                                 logger.info(f"Rule {existing_rule_id} deleted successfully")
                                 await interaction.followup.send(f"✅ Keyword rule '{rule_delete}' deleted successfully!")
                                 return
@@ -535,7 +510,7 @@ class CommandSync:
                         settings.set("ENABLED", True)
                     
                     # Save the settings
-                    keyword_filter_config.settings_manager.save_settings()
+                    filter_config.ENABLED.save_settings()
                     
                     # Prepare a response message summarizing the rule
                     channels_text = ""
@@ -571,13 +546,13 @@ class CommandSync:
                     return
                 
                 # Import configuration
-                from config import reaction_forward_config
+                from config import forward_config
                 from config import embed_config
                 
                 # Get current settings
-                enabled = reaction_forward_config.settings_manager.get("ENABLED", False)
-                category_ids = reaction_forward_config.settings_manager.get("CATEGORY_IDS", [])
-                blacklist_channel_ids = reaction_forward_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
+                enabled = forward_config.ENABLED
+                category_ids = forward_config.CATEGORY_IDS
+                blacklist_channel_ids = forward_config.BLACKLIST_CHANNEL_IDS
                 
                 # If no parameters provided, show current configuration
                 if not any([whitelisted_category_id, blacklisted_channel_id]):
@@ -647,12 +622,9 @@ class CommandSync:
                         
                         # Update categories
                         category_ids = new_category_ids
-                        reaction_forward_config.settings_manager.set("CATEGORY_IDS", category_ids)
+                        forward_config.ENABLED.set("ENABLED", True)
+                        forward_config.CATEGORY_IDS.set("CATEGORY_IDS", category_ids)
                         
-                        # Ensure the feature is enabled when explicitly configuring it
-                        if not enabled:
-                            reaction_forward_config.settings_manager.set("ENABLED", True)
-                            
                     except ValueError:
                         await interaction.response.send_message("⚠️ Invalid category ID format. Please use numbers only.", ephemeral=True)
                         return
@@ -668,18 +640,15 @@ class CommandSync:
                         
                         # Update blacklist
                         blacklist_channel_ids = new_blacklist_ids
-                        reaction_forward_config.settings_manager.set("BLACKLIST_CHANNEL_IDS", blacklist_channel_ids)
+                        forward_config.ENABLED.set("ENABLED", True)
+                        forward_config.BLACKLIST_CHANNEL_IDS.set("BLACKLIST_CHANNEL_IDS", blacklist_channel_ids)
                         
-                        # Ensure the feature is enabled when explicitly configuring it
-                        if not enabled:
-                            reaction_forward_config.settings_manager.set("ENABLED", True)
-                            
                     except ValueError:
                         await interaction.response.send_message("⚠️ Invalid channel ID format. Please use numbers only.", ephemeral=True)
                         return
                 
                 # Save settings
-                if reaction_forward_config.settings_manager.save_settings():
+                if forward_config.ENABLED.save_settings():
                     # Prepare response message
                     response_parts = ["✅ Reaction forward configuration updated!"]
                     
@@ -735,13 +704,12 @@ class CommandSync:
                 from config import pinger_config
                 from config import embed_config
                 
-                # Get current settings directly from settings manager
-                settings = pinger_config.settings_manager
-                pn_enabled = settings.get("ENABLED", False)
-                pn_monitor_everyone = settings.get("MONITOR_EVERYONE", False)
-                pn_monitor_here = settings.get("MONITOR_HERE", False)
-                pn_monitor_roles = settings.get("MONITOR_ROLES", False)
-                pn_notif_channel_id = settings.get("NOTIFICATION_CHANNEL_ID")
+                # Get current settings directly from config object
+                pn_enabled = pinger_config.ENABLED
+                pn_monitor_everyone = pinger_config.MONITOR_EVERYONE
+                pn_monitor_here = pinger_config.MONITOR_HERE
+                pn_monitor_roles = pinger_config.MONITOR_ROLES
+                pn_notif_channel_id = pinger_config.NOTIFICATION_CHANNEL_ID
                 
                 # If no parameters provided, show current settings
                 if not any([channel, everyone, here, roles]):
@@ -818,7 +786,7 @@ class CommandSync:
                         channel_id = int(channel)
                         target_channel = interaction.guild.get_channel(channel_id)
                         if target_channel:
-                            settings.set("NOTIFICATION_CHANNEL_ID", channel_id)
+                            pinger_config.NOTIFICATION_CHANNEL_ID = channel_id
                             response_parts.append(f"Notification channel: <#{channel_id}>")
                             changes_made = True
                         else:
@@ -827,29 +795,29 @@ class CommandSync:
                         response_parts.append("⚠️ Invalid channel ID format")
                 
                 # Update mention monitoring settings
-                if everyone:
-                    settings.set("MONITOR_EVERYONE", True)
-                    response_parts.append("Monitor @everyone: Enabled")
+                if everyone is not None:
+                    pinger_config.MONITOR_EVERYONE = everyone
+                    response_parts.append(f"Monitor @everyone: {'Enabled' if everyone else 'Disabled'}")
                     changes_made = True
                 
-                if here:
-                    settings.set("MONITOR_HERE", True)
-                    response_parts.append("Monitor @here: Enabled")
+                if here is not None:
+                    pinger_config.MONITOR_HERE = here
+                    response_parts.append(f"Monitor @here: {'Enabled' if here else 'Disabled'}")
                     changes_made = True
                 
-                if roles:
-                    settings.set("MONITOR_ROLES", True)
-                    response_parts.append("Monitor @role mentions: Enabled")
+                if roles is not None:
+                    pinger_config.MONITOR_ROLES = roles
+                    response_parts.append(f"Monitor @role mentions: {'Enabled' if roles else 'Disabled'}")
                     changes_made = True
                 
                 # Enable the module if any settings were changed and it's currently disabled
                 if changes_made:
                     if not pn_enabled:
-                        settings.set("ENABLED", True)
+                        pinger_config.ENABLED = True
                         response_parts.append("Module automatically enabled")
                     
                     # Save settings
-                    if settings.save_settings():
+                    if pinger_config.save_config():
                         logger.info(f"Pinger settings updated by {interaction.user}")
                     else:
                         response_parts.append("⚠️ Failed to save settings")
@@ -874,11 +842,11 @@ class CommandSync:
                     return
                 
                 # Import configuration
-                from config import link_reaction_config
+                from config import link_config
                 from config import embed_config
                 
                 # Get current settings
-                stores = link_reaction_config.settings_manager.get("STORES", {})
+                stores = link_config.STORES
                 
                 # LuisaViaRoma store ID (lowercase for consistency)
                 store_id = "luisaviaroma"
@@ -1012,9 +980,9 @@ class CommandSync:
                 stores[store_id] = store_config
                 
                 # Save settings
-                link_reaction_config.settings_manager.set("STORES", stores)
-                link_reaction_config.settings_manager.set("ENABLED", True)
-                if link_reaction_config.settings_manager.save_settings():
+                link_config.STORES.set("STORES", stores)
+                link_config.ENABLED.set("ENABLED", True)
+                if link_config.STORES.save_settings():
                     logger.info(f"LuisaViaRoma link reaction configured by {interaction.user}")
                     
                     # Prepare channel mentions for display
@@ -1055,13 +1023,11 @@ class CommandSync:
                     return
                 
                 # Import configuration
-                from config import link_reaction_config
+                from config import link_config
                 from config import embed_config
-                # Import the remover functionality
-                from modules.mod.link_reaction.remover import remove_pid_from_file
                 
                 # Get current settings
-                stores = link_reaction_config.settings_manager.get("STORES", {})
+                stores = link_config.STORES
                 
                 # LuisaViaRoma store ID (lowercase for consistency)
                 store_id = "luisaviaroma"
@@ -1204,9 +1170,9 @@ class CommandSync:
                     stores = {store_id: store_config}
                 
                 # Save settings
-                link_reaction_config.settings_manager.set("STORES", stores)
-                link_reaction_config.settings_manager.set("ENABLED", True)
-                if link_reaction_config.settings_manager.save_settings():
+                link_config.STORES.set("STORES", stores)
+                link_config.ENABLED.set("ENABLED", True)
+                if link_config.STORES.save_settings():
                     logger.info(f"LuisaViaRoma remover configured by {interaction.user}")
                     
                     # Prepare channel mentions for display

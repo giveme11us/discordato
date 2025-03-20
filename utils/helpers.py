@@ -7,7 +7,7 @@ This module provides common helper functions for the Discord bot.
 import re
 import discord
 from discord.ext import commands
-from config import embed_config
+from config.features.embed_config import embed as embed_config
 
 def is_admin(ctx):
     """

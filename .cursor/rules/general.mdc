@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+From now on when we reference to the project local documentation we will indicate the files inside this path: "data/docs" when i will ask to documentate something please generate/edits/read files in this folder,the only expectactions is the readme file which is the project root folder

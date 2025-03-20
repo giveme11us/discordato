@@ -16,8 +16,18 @@ import discord
 from discord.ext import commands
 
 from core.bot_manager import BotManager
-from config.environment import load_environment
+from config.environment.environment import load_environment
 from core.command_sync import CommandSync
+from config.features.embed_config import embed as embed_config
+from modules.features.mod.keyword_filter.keyword_filter import setup_keyword_filter
+from modules.features.mod.reaction_forward.reaction_forward import setup_reaction_forward
+from modules.features.mod.link_reaction.link_reaction import setup_link_reaction
+from modules.features.mod.pinger.pinger import setup_pinger
+from modules.features.redeye.profile_cmd import setup_profile_cmd
+from config.features.moderation import filter as filter_config, mod as mod_config
+from config.features.reactions import forward as forward_config, link as link_config
+from config.features.pinger_config import pinger_config
+from config.features.redeye_config import redeye as redeye_config
 
 # Remove direct imports of setup functions - we'll use cogs instead
 
@@ -61,7 +71,7 @@ def main():
             bot = bot_manager.bots['main']
             
             # Add application command error handler for consistent styling
-            from config import embed_config
+            from config.features.embed_config import embed as embed_config
             
             @bot.tree.error
             async def on_app_command_error(interaction: discord.Interaction, error):
@@ -150,12 +160,12 @@ def main():
             logger.info("Registered simplified module commands")
             
             # Import the module setup functions
-            from modules.mod.keyword_filter.keyword_filter import setup_keyword_filter
-            from modules.mod.reaction_forward.reaction_forward import setup_reaction_forward
-            from modules.mod.link_reaction.link_reaction import setup_link_reaction
-            from modules.mod.pinger.pinger import setup_pinger
+            from modules.features.mod.keyword_filter.keyword_filter import setup_keyword_filter
+            from modules.features.mod.reaction_forward.reaction_forward import setup_reaction_forward
+            from modules.features.mod.link_reaction.link_reaction import setup_link_reaction
+            from modules.features.mod.pinger.pinger import setup_pinger
             # Import the new redeye module profile command
-            from modules.redeye.profile_cmd import setup_profile_cmd
+            from modules.features.redeye.profile_cmd import setup_profile_cmd
             
             # Set up event handlers directly
             logger.info("Setting up direct event handlers for message and reaction processing")
@@ -163,136 +173,135 @@ def main():
             # We need to create wrapper functions to properly handle property access
             def setup_keyword_filter_wrapper(bot):
                 # Import the module for direct property access bypass
-                from config import keyword_filter_config
-                # Direct access of raw settings to bypass property issues
-                original_filters = keyword_filter_config.settings_manager.get("FILTERS", {})
-                original_category_ids = keyword_filter_config.settings_manager.get("CATEGORY_IDS", [])
-                original_blacklist = keyword_filter_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-                original_notif_channel = keyword_filter_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
+                from config.features.moderation import filter as filter_config
+                # Store original property values
+                original_filters = dict(filter_config.FILTERS)  # Convert to dict to ensure it's serializable
+                original_category_ids = list(filter_config.CATEGORY_IDS)  # Convert to list
+                original_blacklist = list(filter_config.BLACKLIST_CHANNEL_IDS)  # Convert to list
                 
-                # Store original properties
-                original_filters_prop = keyword_filter_config.FILTERS
-                original_category_ids_prop = keyword_filter_config.CATEGORY_IDS
-                original_blacklist_prop = keyword_filter_config.BLACKLIST_CHANNEL_IDS
+                # Store original property descriptors
+                original_filters_prop = type(filter_config).FILTERS
+                original_category_ids_prop = type(filter_config).CATEGORY_IDS
+                original_blacklist_prop = type(filter_config).BLACKLIST_CHANNEL_IDS
                 
-                # Create temporary properties using a lambda to convert the property access to normal attribute
-                keyword_filter_config.FILTERS = property(lambda _: original_filters)
-                keyword_filter_config.CATEGORY_IDS = property(lambda _: original_category_ids)
-                keyword_filter_config.BLACKLIST_CHANNEL_IDS = property(lambda _: original_blacklist)
+                # Override the properties with simple values
+                setattr(type(filter_config), 'FILTERS', original_filters)
+                setattr(type(filter_config), 'CATEGORY_IDS', original_category_ids)
+                setattr(type(filter_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist)
                 
                 try:
                     # Call the original setup function
                     setup_keyword_filter(bot)
                 finally:
-                    # Restore original properties
-                    keyword_filter_config.FILTERS = original_filters_prop
-                    keyword_filter_config.CATEGORY_IDS = original_category_ids_prop
-                    keyword_filter_config.BLACKLIST_CHANNEL_IDS = original_blacklist_prop
+                    # Restore original property descriptors
+                    setattr(type(filter_config), 'FILTERS', original_filters_prop)
+                    setattr(type(filter_config), 'CATEGORY_IDS', original_category_ids_prop)
+                    setattr(type(filter_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist_prop)
             
             def setup_reaction_forward_wrapper(bot):
                 # Import the module for direct property access bypass
-                from config import reaction_forward_config
-                # Direct access of raw settings to bypass property issues
-                original_enabled = reaction_forward_config.settings_manager.get("ENABLED", False)
-                original_msg_forward = reaction_forward_config.settings_manager.get("ENABLE_FORWARDING", False)
-                original_category_ids = reaction_forward_config.settings_manager.get("CATEGORY_IDS", [])
-                original_blacklist = reaction_forward_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-                original_destination_channel = reaction_forward_config.settings_manager.get("DESTINATION_CHANNEL_ID")
+                from config.features.reactions import forward as forward_config
+                # Store original property values
+                original_enabled = bool(forward_config.ENABLED)
+                original_msg_forward = bool(forward_config.ENABLE_FORWARDING)
+                original_category_ids = list(forward_config.CATEGORY_IDS)
+                original_blacklist = list(forward_config.BLACKLIST_CHANNEL_IDS)
+                original_destination_channel = forward_config.DESTINATION_CHANNEL_ID
                 
-                # Store original properties
-                original_enabled_prop = reaction_forward_config.ENABLED
-                original_msg_forward_prop = reaction_forward_config.ENABLE_FORWARDING
-                original_category_ids_prop = reaction_forward_config.CATEGORY_IDS
-                original_blacklist_prop = reaction_forward_config.BLACKLIST_CHANNEL_IDS
-                original_destination_channel_prop = reaction_forward_config.DESTINATION_CHANNEL_ID
+                # Store original property descriptors
+                original_enabled_prop = type(forward_config).ENABLED
+                original_msg_forward_prop = type(forward_config).ENABLE_FORWARDING
+                original_category_ids_prop = type(forward_config).CATEGORY_IDS
+                original_blacklist_prop = type(forward_config).BLACKLIST_CHANNEL_IDS
+                original_destination_channel_prop = type(forward_config).DESTINATION_CHANNEL_ID
                 
-                # Create temporary properties to return fixed values
-                reaction_forward_config.ENABLED = property(lambda _: original_enabled)
-                reaction_forward_config.ENABLE_FORWARDING = property(lambda _: original_msg_forward)
-                reaction_forward_config.CATEGORY_IDS = property(lambda _: original_category_ids)
-                reaction_forward_config.BLACKLIST_CHANNEL_IDS = property(lambda _: original_blacklist)
-                reaction_forward_config.DESTINATION_CHANNEL_ID = property(lambda _: original_destination_channel)
+                # Override the properties with simple values
+                setattr(type(forward_config), 'ENABLED', original_enabled)
+                setattr(type(forward_config), 'ENABLE_FORWARDING', original_msg_forward)
+                setattr(type(forward_config), 'CATEGORY_IDS', original_category_ids)
+                setattr(type(forward_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist)
+                setattr(type(forward_config), 'DESTINATION_CHANNEL_ID', original_destination_channel)
                 
                 try:
                     # Call the original setup function
                     setup_reaction_forward(bot)
                 finally:
-                    # Restore original properties
-                    reaction_forward_config.ENABLED = original_enabled_prop
-                    reaction_forward_config.ENABLE_FORWARDING = original_msg_forward_prop
-                    reaction_forward_config.CATEGORY_IDS = original_category_ids_prop
-                    reaction_forward_config.BLACKLIST_CHANNEL_IDS = original_blacklist_prop
-                    reaction_forward_config.DESTINATION_CHANNEL_ID = original_destination_channel_prop
+                    # Restore original property descriptors
+                    setattr(type(forward_config), 'ENABLED', original_enabled_prop)
+                    setattr(type(forward_config), 'ENABLE_FORWARDING', original_msg_forward_prop)
+                    setattr(type(forward_config), 'CATEGORY_IDS', original_category_ids_prop)
+                    setattr(type(forward_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist_prop)
+                    setattr(type(forward_config), 'DESTINATION_CHANNEL_ID', original_destination_channel_prop)
             
             def setup_link_reaction_wrapper(bot):
                 # Import the module for direct property access bypass
-                from config import link_reaction_config
-                # Direct access of raw settings to bypass property issues
-                original_enabled = link_reaction_config.settings_manager.get("ENABLED", False)
-                original_category_ids = link_reaction_config.settings_manager.get("CATEGORY_IDS", [])
-                original_blacklist = link_reaction_config.settings_manager.get("BLACKLIST_CHANNEL_IDS", [])
-                original_stores = link_reaction_config.settings_manager.get("STORES", [])
+                from config.features.reactions import link as link_config
+                # Store original property values
+                original_enabled = bool(link_config.ENABLED)
+                original_category_ids = list(link_config.CATEGORY_IDS)
+                original_blacklist = list(link_config.BLACKLIST_CHANNEL_IDS)
+                original_stores = link_config.STORES  # Remove dict() call since it's already a dict
                 
-                # Store original properties
-                original_enabled_prop = link_reaction_config.ENABLED
-                original_category_ids_prop = link_reaction_config.CATEGORY_IDS
-                original_blacklist_prop = link_reaction_config.BLACKLIST_CHANNEL_IDS
-                original_stores_prop = link_reaction_config.STORES
+                # Store original property descriptors
+                original_enabled_prop = type(link_config).ENABLED
+                original_category_ids_prop = type(link_config).CATEGORY_IDS
+                original_blacklist_prop = type(link_config).BLACKLIST_CHANNEL_IDS
+                original_stores_prop = type(link_config).STORES
                 
-                # Create temporary properties to return fixed values
-                link_reaction_config.ENABLED = property(lambda _: original_enabled)
-                link_reaction_config.CATEGORY_IDS = property(lambda _: original_category_ids)
-                link_reaction_config.BLACKLIST_CHANNEL_IDS = property(lambda _: original_blacklist)
-                link_reaction_config.STORES = property(lambda _: original_stores)
+                # Override the properties with simple values
+                setattr(type(link_config), 'ENABLED', original_enabled)
+                setattr(type(link_config), 'CATEGORY_IDS', original_category_ids)
+                setattr(type(link_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist)
+                setattr(type(link_config), 'STORES', original_stores)
                 
                 try:
                     # Call the original setup function
                     setup_link_reaction(bot)
                 finally:
-                    # Restore original properties
-                    link_reaction_config.ENABLED = original_enabled_prop
-                    link_reaction_config.CATEGORY_IDS = original_category_ids_prop
-                    link_reaction_config.BLACKLIST_CHANNEL_IDS = original_blacklist_prop
-                    link_reaction_config.STORES = original_stores_prop
+                    # Restore original property descriptors
+                    setattr(type(link_config), 'ENABLED', original_enabled_prop)
+                    setattr(type(link_config), 'CATEGORY_IDS', original_category_ids_prop)
+                    setattr(type(link_config), 'BLACKLIST_CHANNEL_IDS', original_blacklist_prop)
+                    setattr(type(link_config), 'STORES', original_stores_prop)
             
             def setup_pinger_wrapper(bot):
                 # Import the module for direct property access bypass
-                from config import pinger_config
-                # Direct access of raw settings to bypass property issues
-                original_enabled = pinger_config.settings_manager.get("ENABLED", False)
-                original_monitor_everyone = pinger_config.settings_manager.get("MONITOR_EVERYONE", True)
-                original_monitor_here = pinger_config.settings_manager.get("MONITOR_HERE", True)
-                original_monitor_roles = pinger_config.settings_manager.get("MONITOR_ROLES", True)
-                original_notif_channel = pinger_config.settings_manager.get("NOTIFICATION_CHANNEL_ID")
-                original_whitelist = pinger_config.settings_manager.get("WHITELIST_ROLE_IDS", [])
+                from config.features.pinger_config import pinger_config
+                # Store original property values
+                original_enabled = bool(pinger_config.ENABLED)
+                original_monitor_everyone = bool(pinger_config.MONITOR_EVERYONE)
+                original_monitor_here = bool(pinger_config.MONITOR_HERE)
+                original_monitor_roles = bool(pinger_config.MONITOR_ROLES)
+                original_notif_channel = pinger_config.NOTIFICATION_CHANNEL_ID
+                original_whitelist = list(pinger_config.WHITELIST_ROLE_IDS)
                 
-                # Store original properties
-                original_enabled_prop = pinger_config.ENABLED
-                original_monitor_everyone_prop = pinger_config.MONITOR_EVERYONE
-                original_monitor_here_prop = pinger_config.MONITOR_HERE
-                original_monitor_roles_prop = pinger_config.MONITOR_ROLES
-                original_notif_channel_prop = pinger_config.NOTIFICATION_CHANNEL_ID
-                original_whitelist_prop = pinger_config.WHITELIST_ROLE_IDS
+                # Store original property descriptors
+                original_enabled_prop = type(pinger_config).ENABLED
+                original_monitor_everyone_prop = type(pinger_config).MONITOR_EVERYONE
+                original_monitor_here_prop = type(pinger_config).MONITOR_HERE
+                original_monitor_roles_prop = type(pinger_config).MONITOR_ROLES
+                original_notif_channel_prop = type(pinger_config).NOTIFICATION_CHANNEL_ID
+                original_whitelist_prop = type(pinger_config).WHITELIST_ROLE_IDS
                 
-                # Create temporary properties to return fixed values
-                pinger_config.ENABLED = property(lambda _: original_enabled)
-                pinger_config.MONITOR_EVERYONE = property(lambda _: original_monitor_everyone)
-                pinger_config.MONITOR_HERE = property(lambda _: original_monitor_here)
-                pinger_config.MONITOR_ROLES = property(lambda _: original_monitor_roles)
-                pinger_config.NOTIFICATION_CHANNEL_ID = property(lambda _: original_notif_channel)
-                pinger_config.WHITELIST_ROLE_IDS = property(lambda _: original_whitelist)
+                # Override the properties with simple values
+                setattr(type(pinger_config), 'ENABLED', original_enabled)
+                setattr(type(pinger_config), 'MONITOR_EVERYONE', original_monitor_everyone)
+                setattr(type(pinger_config), 'MONITOR_HERE', original_monitor_here)
+                setattr(type(pinger_config), 'MONITOR_ROLES', original_monitor_roles)
+                setattr(type(pinger_config), 'NOTIFICATION_CHANNEL_ID', original_notif_channel)
+                setattr(type(pinger_config), 'WHITELIST_ROLE_IDS', original_whitelist)
                 
                 try:
                     # Call the original setup function
                     setup_pinger(bot)
                 finally:
-                    # Restore original properties
-                    pinger_config.ENABLED = original_enabled_prop
-                    pinger_config.MONITOR_EVERYONE = original_monitor_everyone_prop
-                    pinger_config.MONITOR_HERE = original_monitor_here_prop
-                    pinger_config.MONITOR_ROLES = original_monitor_roles_prop
-                    pinger_config.NOTIFICATION_CHANNEL_ID = original_notif_channel_prop
-                    pinger_config.WHITELIST_ROLE_IDS = original_whitelist_prop
+                    # Restore original property descriptors
+                    setattr(type(pinger_config), 'ENABLED', original_enabled_prop)
+                    setattr(type(pinger_config), 'MONITOR_EVERYONE', original_monitor_everyone_prop)
+                    setattr(type(pinger_config), 'MONITOR_HERE', original_monitor_here_prop)
+                    setattr(type(pinger_config), 'MONITOR_ROLES', original_monitor_roles_prop)
+                    setattr(type(pinger_config), 'NOTIFICATION_CHANNEL_ID', original_notif_channel_prop)
+                    setattr(type(pinger_config), 'WHITELIST_ROLE_IDS', original_whitelist_prop)
             
             def setup_profile_cmd_wrapper(bot):
                 """
@@ -308,26 +317,33 @@ def main():
                     bool: True if successful, False otherwise
                 """
                 # Import the redeye configuration
-                from config import redeye_config
+                from config.features.redeye_config import redeye as redeye_config
                 
                 try:
-                    # Access raw values from settings manager
-                    original_enabled = redeye_config.settings_manager.get("ENABLED", True)
-                    original_notification_channel = redeye_config.settings_manager.get("NOTIFICATION_CHANNEL_ID", None)
+                    # Store original property values
+                    original_enabled = bool(redeye_config.ENABLED)
+                    original_notification_channel = redeye_config.NOTIFICATION_CHANNEL_ID
+                    original_profiles_path = redeye_config.PROFILES_PATH
                     
-                    # Store original properties
-                    original_enabled_prop = redeye_config.ENABLED
-                    original_notification_channel_prop = redeye_config.NOTIFICATION_CHANNEL_ID
+                    # Store original property descriptors
+                    original_enabled_prop = type(redeye_config).ENABLED
+                    original_notification_channel_prop = type(redeye_config).NOTIFICATION_CHANNEL_ID
+                    original_profiles_path_prop = type(redeye_config).PROFILES_PATH
                     
-                    # Override them with fixed properties
-                    redeye_config.ENABLED = original_enabled
-                    redeye_config.NOTIFICATION_CHANNEL_ID = original_notification_channel
+                    # Override the properties with simple values
+                    setattr(type(redeye_config), 'ENABLED', original_enabled)
+                    setattr(type(redeye_config), 'NOTIFICATION_CHANNEL_ID', original_notification_channel)
+                    setattr(type(redeye_config), 'PROFILES_PATH', original_profiles_path)
                     
                     # Now call the actual setup function for the profile command
-                    from modules.redeye.profile_cmd import setup_profile_cmd
+                    from modules.features.redeye.profile_cmd import setup_profile_cmd
                     setup_profile_cmd(bot)
                     
-                    # Restore original settings if needed
+                    # Restore original property descriptors
+                    setattr(type(redeye_config), 'ENABLED', original_enabled_prop)
+                    setattr(type(redeye_config), 'NOTIFICATION_CHANNEL_ID', original_notification_channel_prop)
+                    setattr(type(redeye_config), 'PROFILES_PATH', original_profiles_path_prop)
+                    
                     return True
                 except Exception as e:
                     logger.error(f"Error setting up redeye module: {e}")
