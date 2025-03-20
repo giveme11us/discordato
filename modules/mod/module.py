@@ -24,8 +24,8 @@ def setup(bot, registered_commands=None):
     Set up the mod module.
     
     Args:
-        bot: The Discord bot to set up
-        registered_commands: A set of already registered commands
+        bot: The Discord bot to add commands to
+        registered_commands: Set of already registered commands
     """
     logger.warning("modules/mod/__init__.py is deprecated and will be removed in a future version. Use cogs instead.")
     
@@ -52,7 +52,17 @@ def setup(bot, registered_commands=None):
     from modules.mod.pinger.pinger import setup_pinger
     setup_pinger(bot)
     
-    return True
+    # Register mod_help command
+    if 'mod_help' not in registered_commands:
+        try:
+            from modules.mod.help_cmd import setup_help_cmd
+            setup_help_cmd(bot)
+            registered_commands.add('mod_help')
+            logger.info("Registered mod_help command")
+        except Exception as e:
+            logger.error(f"Could not register mod_help command: {str(e)}")
+    
+    return registered_commands
 
 def teardown(bot):
     """

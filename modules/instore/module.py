@@ -27,6 +27,16 @@ def setup(bot, registered_commands=None):
     # Module is being prepared for future features
     logger.info("In-store module structure ready for future features")
     
+    # Register the help command
+    if 'instore_help' not in registered_commands:
+        try:
+            from modules.instore.help_cmd import setup_help_cmd
+            setup_help_cmd(bot)
+            logger.info("Registered instore_help command")
+            registered_commands.add('instore_help')
+        except Exception as e:
+            logger.error(f"Could not register instore_help command: {str(e)}")
+    
     return registered_commands
 
 def teardown(bot):

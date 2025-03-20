@@ -27,6 +27,16 @@ def setup(bot, registered_commands=None):
     # Module is being prepared for future features
     logger.info("Online module structure ready for future features")
     
+    # Register the help command
+    if 'online_help' not in registered_commands:
+        try:
+            from modules.online.help_cmd import setup_help_cmd
+            setup_help_cmd(bot)
+            logger.info("Registered online_help command")
+            registered_commands.add('online_help')
+        except Exception as e:
+            logger.error(f"Could not register online_help command: {str(e)}")
+    
     return registered_commands
 
 def teardown(bot):

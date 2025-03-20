@@ -31,6 +31,16 @@ def setup(bot, registered_commands=None):
         except Exception as e:
             logger.error(f"Could not register redeye-profiles command: {str(e)}")
     
+    # Register the help command
+    if 'redeye_help' not in registered_commands:
+        try:
+            from modules.redeye.help_cmd import setup_help_cmd
+            setup_help_cmd(bot)
+            logger.info("Registered redeye_help command")
+            registered_commands.add('redeye_help')
+        except Exception as e:
+            logger.error(f"Could not register redeye_help command: {str(e)}")
+    
     return True
 
 def teardown(bot):
