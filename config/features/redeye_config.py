@@ -15,6 +15,7 @@ REDEYE_DEFAULT_CONFIG = {
     "PROFILES_PATH": "data/profiles.json",
     "TASKS_PATH": "data/tasks.json",
     "NOTIFICATION_CHANNEL_ID": None,  # Added for backward compatibility
+    "ROLE_ID": 969204849101119528,  # Role ID for Redeye access
     "DEFAULT_PROFILE": {
         "name": "default",
         "description": "Default profile",
@@ -38,6 +39,15 @@ REDEYE_DEFAULT_CONFIG = {
     }
 }
 
+# File paths
+PROFILES_PATH = 'profiles/profiles.csv'
+
+# Create a redeye config object for easy importing
+redeye: Dict[str, Any] = {
+    'ROLE_ID': REDEYE_DEFAULT_CONFIG["ROLE_ID"],
+    'PROFILES_PATH': PROFILES_PATH,
+}
+
 class RedeyeConfig(BaseConfig):
     """
     Configuration class for the redeye feature.
@@ -53,6 +63,16 @@ class RedeyeConfig(BaseConfig):
             'redeye_config.json'
         )
         super().__init__(config_path, REDEYE_DEFAULT_CONFIG, version="1.0.0")
+    
+    @property
+    def ROLE_ID(self) -> int:
+        """The role ID required for Redeye access."""
+        return self.get("ROLE_ID", 969204849101119528)  # Default role ID as fallback
+    
+    @ROLE_ID.setter
+    def ROLE_ID(self, value: int) -> None:
+        """Set the role ID required for Redeye access."""
+        self.set("ROLE_ID", value)
     
     @property
     def ENABLED(self) -> bool:

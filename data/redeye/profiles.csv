@@ -1,2 +1,6 @@
-Name,TimeoutUpperBound,TimeoutLowerBound,Webhook,DelayUpperBound,DelayLowerBound,KeepConnectionsAlive,FirstName,LastName,Phone,CountryId,Address,ZipCode,City,StateId,CodFisc,UpstreamProxyURL,UpstreamAkmaiCookieURL
-323379312608673803,80000,50000,https://discordapp.com/api/webhooks/677047015674216459/dlTYqKhy302dcIGCbaH4s3EEzEiIdkMxjClxVr03shzF7Jj9deLGVPq1ExaFigLX0tYd,5000,3000,YES,asdasd,asdasd,3242342,IT,333,41111,dasda,PR,,,http://144.91.69.105:18003/get/www.luisaviaroma.com
+Name,Webhook,SizeLowerBound,SizeUpperBound,Multiplier,Email,Password,IsPaypal
+323379312608673803,https://discord.com/api/webhooks/1352646645753315359/rSUC954W1WRKzOfgEiZIYtUNx_vbB6A0q5ite3JjLIfygY6MLxKn0ia6iogy68ELvLjP,39,45,1,dsfdfsdfsdgfdgdfgd@gmail.com,djsfhdsjfsdf,true
+
+474151077948817418_1,https://discord.com/api/webhooks/915246747058602024/LYg1Xj_E-wI8T1VSCOPQzQF5VSpND90OXjqLBqcrcjEQQgkdhG-ubGoWFQ5__XnyfLJQ,41.0,46.0,1,nicolo.floriani@gmail.com,VivaJuve$592,true
+
+323379312608673803_2,https://discord.com/api/webhooks/941641199524126731/mavLj7_uODCWxEuSmjmFdRxmuPaqE-WnlwjTUcyBk_UfnDB7-EXyc9k6e1o2ezE7sbQS,8.0,12.0,1,ivansposatospam@gmail.com,Porcodio1!,true

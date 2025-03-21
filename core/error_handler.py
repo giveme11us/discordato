@@ -32,6 +32,7 @@ import traceback
 import discord
 from discord import app_commands
 from typing import Optional, Dict, Any
+from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
@@ -123,23 +124,8 @@ class ValidationError(BotError):
     """
     pass
 
-class ConfigurationError(BotError):
-    """
-    Raised when configuration issues occur.
-    
-    This error handles:
-    1. Missing configuration
-    2. Invalid settings
-    3. Environment issues
-    4. Dependency problems
-    5. Version conflicts
-    
-    Critical:
-        - Must identify config source
-        - Should suggest corrections
-        - Must track config state
-        - Should support fallbacks
-    """
+class ConfigurationError(Exception):
+    """Raised when there is a configuration error."""
     pass
 
 class DatabaseError(BotError):
@@ -304,17 +290,51 @@ class ErrorHandler:
         Args:
             bot: The Discord bot instance
         """
+        @bot.tree.error
+        async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+            """
+            Handle errors from application commands.
+            
+            Args:
+                interaction: The Discord interaction
+                error: The error that occurred
+            """
+            if isinstance(error, app_commands.CheckFailure):
+                # Check if it's a permission error for redeye module
+                if "doesn't have permission to use Redeye module commands" in str(error):
+                    embed = discord.Embed(
+                        title="Permission Required",
+                        description="You need the appropriate role to use Redeye commands.",
+                        color=discord.Color.red()
+                    )
+                    embed.add_field(
+                        name="How to Get Access",
+                        value="Please contact an administrator to get the required role.",
+                        inline=False
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                else:
+                    await interaction.response.send_message(
+                        f"❌ {str(error)}",
+                        ephemeral=True
+                    )
+            else:
+                logger.error(f"Error in command {interaction.command}: {error}", exc_info=error)
+                await interaction.response.send_message(
+                    "❌ An error occurred while executing the command.",
+                    ephemeral=True
+                )
+        
         @bot.event
-        async def on_error(event: str, *args, **kwargs):
-            error = traceback.format_exc()
-            logger.error(
-                f"Event error",
-                extra={
-                    'event': event,
-                    'error': error,
-                    'args': args,
-                    'kwargs': kwargs
-                }
-            )
+        async def on_error(event, *args, **kwargs):
+            """
+            Handle uncaught errors.
+            
+            Args:
+                event: The event that caused the error
+                args: Positional arguments
+                kwargs: Keyword arguments
+            """
+            logger.error(f"Error in {event}", exc_info=True)
             
         logger.info("Error handling system initialized") 

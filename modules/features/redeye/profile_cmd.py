@@ -1,7 +1,7 @@
 """
 Redeye Profile Command
 
-Command for viewing profiles from the profiles.csv file.
+Command for viewing and managing profiles from the profiles.csv file.
 """
 
 import os
@@ -9,172 +9,598 @@ import csv
 import discord
 from discord import app_commands
 import logging
+import sys
+from pathlib import Path
+
+# Add the project root to the Python path
+project_root = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(project_root))
+
 from utils.permissions import redeye_only
 from config.features.redeye_config import redeye as redeye_config
 from config.features.embed_config import embed as embed_config
+from typing import Optional, List, Set
+from discord.ext import commands
 
+# Set up debug logging
 logger = logging.getLogger('discord_bot.modules.redeye.profile_cmd')
+logger.setLevel(logging.DEBUG)
 
-async def handle_profile_view(interaction, profile_name=None):
-    """
-    Handle the profile view command.
+class RedeyePermissionError(app_commands.CheckFailure):
+    """Custom error for Redeye permission failures."""
+    pass
+
+def apply_embed_settings(embed: discord.Embed) -> discord.Embed:
+    """Apply global embed settings to an embed."""
+    # Handle color value that could be either string or int
+    color_value = embed_config.EMBED_COLOR
+    if isinstance(color_value, str):
+        color_value = int(color_value, 16)
+    embed.color = discord.Color(color_value)
     
-    Args:
-        interaction: The Discord interaction
-        profile_name: Optional name of a specific profile to view
-    """
-    profiles_path = redeye_config.PROFILES_PATH
-    
-    # Check if profiles file exists
-    if not os.path.exists(profiles_path):
-        await interaction.response.send_message(
-            f"❌ Profiles file not found at: `{profiles_path}`", 
-            ephemeral=True
-        )
-        return
-    
+    embed.set_footer(text=embed_config.FOOTER_TEXT, icon_url=embed_config.FOOTER_ICON_URL)
+    embed.set_thumbnail(url=embed_config.THUMBNAIL_URL)
+    if embed_config.INCLUDE_TIMESTAMP:
+        embed.timestamp = discord.utils.utcnow()
+    return embed
+
+def get_user_profiles(user_id: str) -> List[dict]:
+    """Get all profiles for a user."""
+    profiles = []
     try:
-        # Read profiles from CSV
-        profiles = []
-        with open(profiles_path, 'r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                profiles.append(row)
-        
-        if not profiles:
-            await interaction.response.send_message(
-                "❌ No profiles found in the profiles file.",
-                ephemeral=True
+        if os.path.exists(redeye_config.PROFILES_PATH):
+            with open(redeye_config.PROFILES_PATH, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Check if the profile belongs to the user
+                    if row['Name'].startswith(user_id):
+                        profiles.append(row)
+    except Exception as e:
+        logger.error(f"Error reading profiles: {e}", exc_info=True)
+    
+    return sorted(profiles, key=lambda x: int(x['Name'].split('_')[1]) if '_' in x['Name'] else 0)
+
+def has_redeye_permission():
+    """Check if user has permission to use Redeye commands."""
+    async def predicate(interaction: discord.Interaction) -> bool:
+        try:
+            logger.debug(f"=== Permission Check Start ===")
+            logger.debug(f"User ID: {interaction.user.id}")
+            
+            # Get whitelisted role IDs from environment
+            whitelisted_roles = os.getenv('REDEYE_WHITELIST_ROLE_IDS', '').split(',')
+            whitelisted_roles = [int(role_id) for role_id in whitelisted_roles if role_id]
+            logger.debug(f"Whitelisted Role IDs: {whitelisted_roles}")
+            
+            # Check if we're in a guild
+            if not interaction.guild:
+                logger.debug("Not in a guild context")
+                raise RedeyePermissionError("This command can only be used in a server.")
+
+            # Check if the user is a member
+            if not isinstance(interaction.user, discord.Member):
+                logger.debug("User is not a Member instance")
+                raise RedeyePermissionError("Could not verify user permissions.")
+            
+            try:
+                # Get fresh member data
+                logger.debug("Fetching fresh member data...")
+                member = await interaction.guild.fetch_member(interaction.user.id)
+                logger.debug(f"Member fetched: {member.id}")
+                
+                # Get member's roles
+                member_roles = member.roles
+                role_ids = [r.id for r in member_roles]
+                logger.debug(f"Member roles: {role_ids}")
+                
+                # Check if user has any of the whitelisted roles
+                has_role = any(role_id in whitelisted_roles for role_id in role_ids)
+                logger.debug(f"Has whitelisted role: {has_role}")
+                
+                if not has_role:
+                    role_names = []
+                    for role_id in whitelisted_roles:
+                        role = discord.utils.get(interaction.guild.roles, id=role_id)
+                        if role:
+                            role_names.append(role.name)
+                    role_list = " or ".join(role_names)
+                    raise RedeyePermissionError(f"You need the {role_list} role to use Redeye module commands.")
+                
+                logger.debug("=== Permission Check Success ===")
+                return True
+                
+            except discord.NotFound:
+                logger.debug("Member not found")
+                raise RedeyePermissionError("Could not verify user permissions. Please try again.")
+            except Exception as e:
+                if isinstance(e, RedeyePermissionError):
+                    raise
+                logger.error(f"Error fetching fresh data: {e}", exc_info=True)
+                raise RedeyePermissionError("An error occurred while checking permissions.")
+            
+        except Exception as e:
+            if isinstance(e, RedeyePermissionError):
+                raise
+            logger.error(f"Error checking Redeye permissions: {e}", exc_info=True)
+            logger.debug("=== Permission Check Error ===")
+            raise RedeyePermissionError("An error occurred while checking permissions.")
+    
+    return app_commands.check(predicate)
+
+# Add error handler for the commands
+async def handle_permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    """Handle permission check errors."""
+    if isinstance(error, RedeyePermissionError):
+        if not interaction.response.is_done():
+            embed = discord.Embed(
+                title="❌ Permission Required",
+                description=str(error),
+                color=discord.Color.red()
             )
-            return
-        
-        # If profile_name is specified, filter to just that profile
-        if profile_name:
-            profiles = [p for p in profiles if p.get('Name', '').lower() == profile_name.lower()]
-            if not profiles:
+            embed = apply_embed_settings(embed)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return True
+    return False
+
+class ProfileModal(discord.ui.Modal, title='Add Profile'):
+    """Modal for adding a new profile."""
+    
+    webhook = discord.ui.TextInput(
+        label='Webhook URL',
+        placeholder='Enter your webhook URL',
+        required=True,
+    )
+    
+    size_lower = discord.ui.TextInput(
+        label='Size Lower Bound',
+        placeholder='Enter lower bound (e.g. 8)',
+        required=True,
+    )
+    
+    size_upper = discord.ui.TextInput(
+        label='Size Upper Bound',
+        placeholder='Enter upper bound (e.g. 12)',
+        required=True,
+    )
+    
+    email = discord.ui.TextInput(
+        label='Email',
+        placeholder='Enter your email',
+        required=True,
+    )
+    
+    password = discord.ui.TextInput(
+        label='Password',
+        placeholder='Enter your password',
+        required=True,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle form submission."""
+        try:
+            # Validate size bounds
+            try:
+                lower = float(self.size_lower.value)
+                upper = float(self.size_upper.value)
+                if lower >= upper:
+                    raise ValueError("Lower bound must be less than upper bound")
+            except ValueError as e:
                 await interaction.response.send_message(
-                    f"❌ Profile '{profile_name}' not found.",
+                    f"❌ Invalid size range: {str(e)}",
                     ephemeral=True
                 )
                 return
-        
-        # Create embed for the profile(s)
-        if profile_name and profiles:
-            # Single profile view
-            profile = profiles[0]
-            embed = create_profile_embed(profile)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        else:
-            # List all profiles
-            embed = discord.Embed(
-                title="Redeye Profiles",
-                description=f"Found {len(profiles)} profiles in total."
-            )
-            
-            # Apply styling from embed_config
-            embed = embed_config.apply_default_styling(embed)
-            
-            # Add each profile as a field
-            for i, profile in enumerate(profiles):
-                name = profile.get('Name', 'Unnamed')
-                field_value = f"**Profile Name:** {name}"
-                
-                embed.add_field(
-                    name=f"{i+1}. {name}",
-                    value=field_value,
-                    inline=True
-                )
-            
-            # Add usage instructions as a field instead of footer
-            embed.add_field(
-                name="Examples",
-                value="Use `/redeye-profiles profile_name:Test` to view full details of a specific profile.",
-                inline=False
-            )
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            
-    except Exception as e:
-        logger.error(f"Error reading profiles file: {str(e)}")
-        await interaction.response.send_message(
-            f"❌ Error reading profiles: {str(e)}",
-            ephemeral=True
-        )
 
-def create_profile_embed(profile):
+            # Get existing profiles to determine the next profile number
+            user_id = str(interaction.user.id)
+            existing_profiles = get_user_profiles(user_id)
+            profile_number = len(existing_profiles) + 1
+            profile_name = f"{user_id}_{profile_number}"
+
+            # Create profile data in the correct order:
+            # Name,Webhook,SizeLowerBound,SizeUpperBound,Multiplier,Email,Password,IsPaypal
+            profile_data = {
+                'Name': profile_name,
+                'Webhook': self.webhook.value,
+                'SizeLowerBound': str(lower),
+                'SizeUpperBound': str(upper),
+                'Multiplier': '1',
+                'Email': self.email.value,
+                'Password': self.password.value,
+                'IsPaypal': 'true'
+            }
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(redeye_config.PROFILES_PATH), exist_ok=True)
+
+            # Write to CSV
+            file_exists = os.path.exists(redeye_config.PROFILES_PATH)
+            
+            # If file doesn't exist, create it with headers in the correct order
+            fieldnames = ['Name', 'Webhook', 'SizeLowerBound', 'SizeUpperBound', 'Multiplier', 'Email', 'Password', 'IsPaypal']
+            
+            if not file_exists:
+                with open(redeye_config.PROFILES_PATH, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+            
+            # Append the new profile with a newline
+            with open(redeye_config.PROFILES_PATH, 'a', newline='') as f:
+                # Add a newline if file exists and doesn't end with one
+                if file_exists:
+                    f.write('\n')
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writerow(profile_data)
+
+            embed = discord.Embed(title="✅ Profile Added Successfully")
+            embed = apply_embed_settings(embed)
+            embed.description = f"Profile #{profile_number} created for {interaction.user.mention}"
+            embed.add_field(
+                name="Size Range",
+                value=f"{lower} - {upper}",
+                inline=True
+            )
+            embed.add_field(
+                name="Email",
+                value=self.email.value,
+                inline=True
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"Error adding profile: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ An error occurred while adding your profile.",
+                ephemeral=True
+            )
+
+def remove_profile(user_id: str, profile_number: int) -> bool:
     """
-    Create an embed for a single profile.
+    Remove a profile from the CSV file.
     
     Args:
-        profile: Profile data dictionary
+        user_id: The user's ID
+        profile_number: The profile number to remove
     
     Returns:
-        discord.Embed: The created embed
+        bool: True if profile was removed successfully
     """
-    name = profile.get('Name', 'Unnamed')
-    
-    embed = discord.Embed(
-        title=f"Profile: {name}",
-        description="Detailed profile information"
-    )
-    
-    # Apply styling from embed_config
-    embed = embed_config.apply_default_styling(embed)
-    
-    # Webhook
-    embed.add_field(
-        name="Webhook",
-        value=f"`{profile.get('Webhook', 'None')}`",
-        inline=False
-    )
-    
-    # Personal information
-    personal_info = (
-        f"**Name:** {profile.get('FirstName', 'N/A')} {profile.get('LastName', 'N/A')}\n"
-        f"**Phone:** {profile.get('Phone', 'N/A')}\n"
-        f"**Address:** {profile.get('Address', 'N/A')}\n"
-        f"**City:** {profile.get('City', 'N/A')}\n"
-        f"**Zip:** {profile.get('ZipCode', 'N/A')}\n"
-        f"**State:** {profile.get('StateId', 'N/A')}\n"
-        f"**Country:** {profile.get('CountryId', 'N/A')}\n"
-        f"**Fiscal Code:** {profile.get('CodFisc', 'N/A')}"
-    )
-    embed.add_field(
-        name="Personal Information",
-        value=personal_info,
-        inline=False
-    )
-    
-    return embed
+    try:
+        if not os.path.exists(redeye_config.PROFILES_PATH):
+            return False
+            
+        # Read all profiles
+        profiles = []
+        with open(redeye_config.PROFILES_PATH, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            headers = reader.fieldnames
+            for row in reader:
+                profiles.append(row)
+        
+        # Get user's profiles
+        user_profiles = [p for p in profiles if p['Name'].startswith(user_id)]
+        if not user_profiles or profile_number > len(user_profiles):
+            return False
+            
+        # Find the profile to remove
+        profile_to_remove = user_profiles[profile_number - 1]
+        profiles.remove(profile_to_remove)
+        
+        # Write back all profiles except the removed one
+        with open(redeye_config.PROFILES_PATH, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+            writer.writerows(profiles)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error removing profile: {e}", exc_info=True)
+        return False
 
-def setup_profile_cmd(bot):
+async def setup_profile_cmd(bot, registered_commands=None):
     """
-    Set up the redeye-profiles command.
+    Set up the redeye profile commands.
     
     Args:
         bot: The Discord bot to add the command to
+        registered_commands: Optional set of registered commands
     """
-    logger.info("Setting up redeye-profiles command")
+    logger.info("Setting up redeye profile commands")
     
-    @bot.tree.command(
-        name="redeye-profiles",
-        description="View profiles from the Redeye profiles.csv file"
-    )
+    # Create the command group
+    redeye = app_commands.Group(name='redeye', description='Redeye module commands')
+    
+    @redeye.command(name="profile-view")
     @app_commands.describe(
-        profile_name="Optional: Name of a specific profile to view"
+        profile_number="Optional: Profile number to view (1, 2, 3, etc.)"
     )
-    @redeye_only()
-    async def redeye_profiles(
+    @has_redeye_permission()
+    async def view_profiles(
         interaction: discord.Interaction,
-        profile_name: str = None
+        profile_number: Optional[int] = None
     ):
-        """
-        View profiles from the Redeye profiles.csv file.
-        
-        Args:
-            interaction: The Discord interaction
-            profile_name: Optional name of a specific profile to view
-        """
-        await handle_profile_view(interaction, profile_name)
+        """View profiles from the Redeye profiles.csv file."""
+        try:
+            user_id = str(interaction.user.id)
+            user_profiles = get_user_profiles(user_id)
+            
+            if not user_profiles:
+                embed = discord.Embed(title="No Profile Found")
+                embed = apply_embed_settings(embed)
+                embed.description = "You don't have any profiles set up yet."
+                embed.add_field(
+                    name="Add a Profile",
+                    value="Use `/redeye profile-add` to create your profile.",
+                    inline=False
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+
+            # If only one profile or specific profile requested, show detailed view
+            if len(user_profiles) == 1 or profile_number:
+                if profile_number:
+                    if profile_number < 1 or profile_number > len(user_profiles):
+                        await interaction.response.send_message(
+                            f"❌ Profile #{profile_number} not found. You have {len(user_profiles)} profile(s).",
+                            ephemeral=True
+                        )
+                        return
+                    profile = user_profiles[profile_number - 1]
+                else:
+                    profile = user_profiles[0]
+
+                embed = discord.Embed(title=f"Profile #{profile['Name'].split('_')[1] if '_' in profile['Name'] else '1'}")
+                embed = apply_embed_settings(embed)
+                embed.add_field(
+                    name="Size Range",
+                    value=f"{profile['SizeLowerBound']} - {profile['SizeUpperBound']}",
+                    inline=True
+                )
+                embed.add_field(
+                    name="Email",
+                    value=profile['Email'],
+                    inline=True
+                )
+                embed.add_field(
+                    name="Password",
+                    value=f"||{profile['Password']}||",
+                    inline=True
+                )
+                embed.add_field(
+                    name="Webhook",
+                    value=profile['Webhook'],
+                    inline=False
+                )
+            else:
+                # Show profile list
+                embed = discord.Embed(title="Your Profiles")
+                embed = apply_embed_settings(embed)
+                embed.description = f"Found {len(user_profiles)} profiles. Use `/redeye profile-view profile_number:X` to view details."
+                for i, profile in enumerate(user_profiles, 1):
+                    embed.add_field(
+                        name=f"Profile #{i}",
+                        value=f"Size: {profile['SizeLowerBound']} - {profile['SizeUpperBound']}\nEmail: {profile['Email']}",
+                        inline=False
+                    )
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"Error viewing profile: {e}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ An error occurred while viewing profiles.",
+                    ephemeral=True
+                )
     
-    logger.info("Successfully set up redeye-profiles command") 
+    @redeye.command(name="profile-add")
+    @has_redeye_permission()
+    async def add_profile(interaction: discord.Interaction):
+        """Add a new profile to the Redeye profiles.csv file."""
+        try:
+            modal = ProfileModal()
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            logger.error(f"Error showing profile modal: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ An error occurred while opening the profile form.",
+                ephemeral=True
+            )
+    
+    @redeye.command(name="profile-remove")
+    @app_commands.describe(
+        profile_number="The profile number to remove (1, 2, 3, etc.)"
+    )
+    @has_redeye_permission()
+    async def remove_profile_cmd(
+        interaction: discord.Interaction,
+        profile_number: Optional[int] = None
+    ):
+        """Remove a profile from your profiles list."""
+        try:
+            user_id = str(interaction.user.id)
+            user_profiles = get_user_profiles(user_id)
+            
+            if not user_profiles:
+                embed = discord.Embed(title="No Profiles Found")
+                embed = apply_embed_settings(embed)
+                embed.description = "You don't have any profiles to remove."
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            
+            # If user has only one profile, remove it without asking for a number
+            if len(user_profiles) == 1:
+                profile_number = 1
+            
+            # If user has multiple profiles but didn't specify which one
+            if profile_number is None:
+                embed = discord.Embed(title="Multiple Profiles Found")
+                embed = apply_embed_settings(embed)
+                embed.description = "Please specify which profile to remove using the profile number."
+                for i, profile in enumerate(user_profiles, 1):
+                    embed.add_field(
+                        name=f"Profile #{i}",
+                        value=f"Size: {profile['SizeLowerBound']} - {profile['SizeUpperBound']}\nEmail: {profile['Email']}",
+                        inline=False
+                    )
+                embed.add_field(
+                    name="Usage",
+                    value="Use `/redeye profile-remove profile_number:X` to remove a specific profile.",
+                    inline=False
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            
+            # Validate profile number
+            if profile_number < 1 or profile_number > len(user_profiles):
+                await interaction.response.send_message(
+                    f"❌ Profile #{profile_number} not found. You have {len(user_profiles)} profile(s).",
+                    ephemeral=True
+                )
+                return
+            
+            # Remove the profile
+            profile = user_profiles[profile_number - 1]
+            if remove_profile(user_id, profile_number):
+                embed = discord.Embed(title="✅ Profile Removed")
+                embed = apply_embed_settings(embed)
+                embed.description = f"Successfully removed Profile #{profile_number}"
+                embed.add_field(
+                    name="Profile Details",
+                    value=f"Size: {profile['SizeLowerBound']} - {profile['SizeUpperBound']}\nEmail: {profile['Email']}",
+                    inline=False
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    "❌ An error occurred while removing the profile.",
+                    ephemeral=True
+                )
+                
+        except Exception as e:
+            logger.error(f"Error removing profile: {e}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ An error occurred while removing the profile.",
+                ephemeral=True
+            )
+    
+    # Add error handlers for the commands
+    @view_profiles.error
+    async def view_profiles_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if not await handle_permission_error(interaction, error):
+            # Only propagate the error if we didn't handle it
+            raise error
+    
+    @add_profile.error
+    async def add_profile_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if not await handle_permission_error(interaction, error):
+            raise error
+    
+    @remove_profile_cmd.error
+    async def remove_profile_cmd_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if not await handle_permission_error(interaction, error):
+            raise error
+    
+    # Add the command group to the bot
+    await bot.tree.sync()
+    bot.tree.add_command(redeye)
+    
+    logger.info("Successfully set up redeye profile commands")
+    
+    # Return registered_commands if provided
+    return registered_commands if registered_commands is not None else set()
+
+@app_commands.command(name="profile-view")
+@has_redeye_permission()
+async def handle_profile_view(
+    interaction: discord.Interaction,
+    profile_number: Optional[int] = None
+):
+    """
+    View profiles command.
+    
+    Args:
+        interaction: The Discord interaction
+        profile_number: Optional profile number to view specific profile
+    """
+    try:
+        user_profiles = get_user_profiles(str(interaction.user.id))
+        
+        if not user_profiles:
+            embed = discord.Embed(title="No Profile Found")
+            embed = apply_embed_settings(embed)
+            embed.description = "You don't have any profiles set up yet."
+            embed.add_field(
+                name="Add a Profile",
+                value="Use `/redeye profile-add` to create your profile.",
+                inline=False
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        if profile_number:
+            # Show specific profile
+            if profile_number < 1 or profile_number > len(user_profiles):
+                await interaction.response.send_message(
+                    f"❌ Profile #{profile_number} not found. You have {len(user_profiles)} profile(s).",
+                    ephemeral=True
+                )
+                return
+            profile = user_profiles[profile_number - 1]
+
+            embed = discord.Embed(title=f"Profile #{profile['Name'].split('_')[1] if '_' in profile['Name'] else '1'}")
+            embed = apply_embed_settings(embed)
+            embed.add_field(
+                name="Size Range",
+                value=f"{profile['SizeLowerBound']} - {profile['SizeUpperBound']}",
+                inline=True
+            )
+            embed.add_field(
+                name="Email",
+                value=profile['Email'],
+                inline=True
+            )
+            embed.add_field(
+                name="Password",
+                value=f"||{profile['Password']}||",
+                inline=True
+            )
+            embed.add_field(
+                name="Webhook",
+                value=profile['Webhook'],
+                inline=False
+            )
+        else:
+            # Show all profiles
+            embed = discord.Embed(title="Your Profiles")
+            embed = apply_embed_settings(embed)
+            embed.description = f"Found {len(user_profiles)} profiles. Use `/redeye profile-view profile_number:X` to view details."
+            for i, profile in enumerate(user_profiles, 1):
+                embed.add_field(
+                    name=f"Profile #{i}",
+                    value=f"Size: {profile['SizeLowerBound']} - {profile['SizeUpperBound']}\nEmail: {profile['Email']}",
+                    inline=False
+                )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        logger.error(f"Error viewing profile: {e}", exc_info=True)
+        await interaction.response.send_message(
+            "❌ An error occurred while viewing profiles.",
+            ephemeral=True
+        )
+
+@app_commands.command(name="profile-add")
+@has_redeye_permission()
+async def handle_profile_add(interaction: discord.Interaction):
+    """Add profile command."""
+    try:
+        modal = ProfileModal()
+        await interaction.response.send_modal(modal)
+    except Exception as e:
+        logger.error(f"Error showing profile modal: {e}", exc_info=True)
+        await interaction.response.send_message(
+            "❌ An error occurred while opening the profile form.",
+            ephemeral=True
+        ) 

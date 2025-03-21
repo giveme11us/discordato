@@ -30,52 +30,50 @@ async def handle_redeye_help(interaction):
     # Add general information
     embed.add_field(
         name="👤 Profile Management",
-        value="View and manage profiles stored in CSV files.\n`/redeye-profiles` - View profiles\n`/redeye-config` - Configure file paths",
+        value="View and manage profiles stored in CSV files.\n`/redeye profile-view` - View profiles\n`/redeye profile-add` - Add a new profile\n`/redeye_help` - Show this help message",
         inline=False
     )
     
     # Add detailed command information
     embed.add_field(
-        name="/redeye-profiles",
+        name="/redeye profile-view",
         value="View all profiles or details for a specific profile.\n**Parameters:**\n`profile_name` - (Optional) Name of a specific profile to view",
         inline=False
     )
     
     embed.add_field(
-        name="/redeye-config",
-        value="View or update file path configurations.\n**Parameters:**\n`profiles_path` - (Optional) Path to profiles CSV file\n`tasks_path` - (Optional) Path to tasks CSV file",
+        name="/redeye profile-add",
+        value="Add a new profile to the profiles.csv file. You will be prompted to enter all required information through an interactive form.",
         inline=False
     )
     
     # Add examples
     examples = (
         "**Examples:**\n"
-        "`/redeye-profiles` - Show all profiles\n"
-        "`/redeye-profiles profile_name:MyProfile1` - Show details for a specific profile\n"
-        "`/redeye-config` - Show current file paths\n"
-        "`/redeye-config profiles_path:/path/to/profiles.csv` - Update profiles file path"
+        "`/redeye profile-view` - Show all profiles\n"
+        "`/redeye profile-view profile_name:MyProfile1` - Show details for a specific profile\n"
+        "`/redeye profile-add` - Add a new profile through an interactive form"
     )
     embed.add_field(name="Command Examples", value=examples, inline=False)
     
     # Add CSV file format information
     file_format = (
         "**profiles.csv columns:**\n"
-        "Name, Webhook, FirstName, LastName, Phone, CountryId, Address, ZipCode, City, StateId, CodFisc\n\n"
-        "**tasks.csv columns:**\n"
-        "ProfileName, Pid, Email, Password"
+        "Name, Webhook, FirstName, LastName, Phone, CountryId, Address, ZipCode, City, StateId, CodFisc"
     )
     embed.add_field(name="File Format", value=file_format, inline=False)
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-def setup_help_cmd(bot):
+def setup_help_cmd(bot, registered_commands=None):
     """
-    Set up the redeye_help command.
+    Set up the redeye help command.
     
     Args:
         bot: The Discord bot to add the command to
+        registered_commands: Optional set of registered commands
     """
-    logger.info("Setting up redeye_help command")
+    logger.info("Setting up redeye help command")
     
     @bot.tree.command(
         name="redeye_help",
@@ -83,12 +81,10 @@ def setup_help_cmd(bot):
     )
     @redeye_only()
     async def redeye_help(interaction: discord.Interaction):
-        """
-        Display help information for the redeye module.
-        
-        Args:
-            interaction: The Discord interaction
-        """
+        """Display help information for the redeye module."""
         await handle_redeye_help(interaction)
     
-    logger.info("Successfully set up redeye_help command") 
+    logger.info("Successfully set up redeye help command")
+    
+    # Return registered_commands if provided
+    return registered_commands if registered_commands is not None else set() 

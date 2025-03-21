@@ -22,7 +22,7 @@ load_dotenv()
 # Configure logging
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         RotatingFileHandler(
@@ -33,6 +33,10 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+# Set discord.py's logger to INFO to avoid excessive debug messages
+discord_logger = logging.getLogger('discord')
+discord_logger.setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +93,20 @@ class DiscordBot(commands.Bot):
         # Load enabled modules
         registered_commands = set()
         
+        # Clear all existing commands first
+        self.tree.clear_commands(guild=None)  # Clear global commands
+        for guild_id in GUILD_IDS:
+            guild = discord.Object(id=guild_id)
+            self.tree.clear_commands(guild=guild)
+        
+        # Load enabled modules
         for module_name in ENABLED_MODULES:
             try:
-                module = __import__(f"modules.{module_name}", fromlist=["setup"])
+                # Check if module is in features directory
+                if module_name in ['redeye', 'instore', 'online']:
+                    module = __import__(f"modules.features.{module_name}", fromlist=["setup"])
+                else:
+                    module = __import__(f"modules.{module_name}", fromlist=["setup"])
                 if hasattr(module, "setup"):
                     registered_commands = await module.setup(self, registered_commands)
                     logger.info(f"Loaded module: {module_name}")
@@ -103,8 +118,20 @@ class DiscordBot(commands.Bot):
             try:
                 guild = discord.Object(id=guild_id)
                 self.tree.copy_global_to(guild=guild)
-                await self.tree.sync(guild=guild)
+                synced = await self.tree.sync(guild=guild)
                 logger.info(f"Synced commands to development guild: {guild_id}")
+                
+                # Log all synced commands and their structure
+                logger.info("=== Synced Command Structure ===")
+                for cmd in self.tree.get_commands(guild=guild):
+                    logger.info(f"Command: /{cmd.name}")
+                    if hasattr(cmd, 'commands'):  # Group command
+                        for subcmd in cmd.commands:
+                            logger.info(f"  ├─ /{cmd.name} {subcmd.name}")
+                            if hasattr(subcmd, 'commands'):  # Nested group
+                                for nested_cmd in subcmd.commands:
+                                    logger.info(f"  │  └─ /{cmd.name} {subcmd.name} {nested_cmd.name}")
+                logger.info("===============================")
             except Exception as e:
                 logger.error(f"Error syncing commands to guild {guild_id}: {e}")
                 
