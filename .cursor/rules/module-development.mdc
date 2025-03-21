@@ -1,0 +1,258 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule Name: Module Development Guidelines
+Version: 1.0.0
+Last Updated: 2024-03-20
+Tags: #modules #architecture #extensibility
+
+## Purpose
+Defines the standard approach for creating new functional modules within the Discord bot, ensuring proper integration with the core framework and maintaining the modular architecture.
+
+## Critical Requirements
+- Modules must be self-contained with clear boundaries
+- Modules must implement standard setup and teardown functions
+- Modules must register commands through the central registry
+- Modules must handle their own resources and cleanup
+
+## Module Structure
+
+### Directory Organization
+```
+modules/
+└── new_module/
+    ├── __init__.py
+    ├── module.py        # Main module definition with setup/teardown
+    ├── commands.py      # Command implementations
+    └── utils/           # Module-specific utilities
+        ├── __init__.py
+        └── helpers.py   # Helper functions
+```
+
+### Module Definition
+```python
+# modules/new_module/module.py
+
+from .commands import register_commands
+
+def setup(bot, registered_commands=None):
+    """
+    Initialize the module and register commands.
+    
+    Args:
+        bot: The Discord bot instance
+        registered_commands: Set of already registered commands
+    """
+    # Initialize registered_commands if not provided
+    if registered_commands is None:
+        registered_commands = set()
+    
+    # Register module commands
+    register_commands(bot, registered_commands)
+    
+    # Additional setup logic
+    # - Event listeners
+    # - Background tasks
+    # - Resource initialization
+    
+    return registered_commands
+
+def teardown(bot):
+    """
+    Clean up module resources.
+    
+    Args:
+        bot: The Discord bot instance
+    """
+    # Clean up resources
+    # - Cancel tasks
+    # - Close connections
+    # - Remove event listeners
+```
+
+### Command Registration
+```python
+# modules/new_module/commands.py
+
+def register_commands(bot, registered_commands):
+    """
+    Register all module commands.
+    
+    Args:
+        bot: The Discord bot instance
+        registered_commands: Set of already registered commands
+    """
+    # Register each command if not already registered
+    if "new_module_command" not in registered_commands:
+        @bot.tree.command(
+            name="new_module_command",
+            description="Description of the command"
+        )
+        async def new_module_command(interaction):
+            await command_handler(interaction)
+        
+        registered_commands.add("new_module_command")
+
+async def command_handler(interaction):
+    """
+    Handle the command interaction.
+    
+    Args:
+        interaction: The Discord interaction
+    """
+    # Command implementation
+    pass
+```
+
+## Implementation Guidelines
+
+### Module Integration
+1. **Create Module Directory**
+   ```bash
+   mkdir -p modules/new_module
+   touch modules/new_module/__init__.py
+   ```
+
+2. **Implement Module Interface**
+   - Create module.py with setup and teardown functions
+   - Implement command registration logic
+   - Add event listeners if needed
+
+3. **Update Environment Configuration**
+   - Add module to ENABLED_MODULES in .env file
+   - Add module-specific configuration variables
+
+4. **Documentation**
+   - Create module documentation in data/docs/modules/
+   - Document available commands and configuration options
+
+### Module Types
+
+#### Feature Modules
+- Implement specific bot features
+- Register related commands
+- Manage feature-specific resources
+
+#### Integration Modules
+- Connect to external services
+- Handle authentication and API calls
+- Implement webhook handlers
+
+#### Utility Modules
+- Provide helper functions
+- May not register commands
+- Support other modules
+
+## Best Practices
+
+### Event Handling
+```python
+def setup(bot, registered_commands=None):
+    # Register event handlers
+    bot.add_listener(on_message_handler, "on_message")
+    
+def teardown(bot):
+    # Remove event handlers
+    bot.remove_listener(on_message_handler, "on_message")
+    
+async def on_message_handler(message):
+    # Event handler implementation
+    pass
+```
+
+### Background Tasks
+```python
+import asyncio
+
+task = None
+
+def setup(bot, registered_commands=None):
+    global task
+    # Start background task
+    task = asyncio.create_task(background_loop(bot))
+    
+def teardown(bot):
+    global task
+    # Cancel background task
+    if task and not task.cancelled():
+        task.cancel()
+    
+async def background_loop(bot):
+    while True:
+        # Perform background work
+        await asyncio.sleep(60)  # Sleep for 60 seconds
+```
+
+### Resource Management
+- Initialize resources in setup
+- Release resources in teardown
+- Use context managers where appropriate
+- Handle exceptions gracefully
+
+## Testing Requirements
+- Unit tests for module functionality
+- Integration tests with the core framework
+- Configuration validation tests
+- Error handling tests
+
+## Examples
+
+### ✅ Good Module Example
+```python
+# modules/example_module/module.py
+import logging
+from .commands import register_commands
+
+logger = logging.getLogger(__name__)
+
+def setup(bot, registered_commands=None):
+    logger.info("Setting up example module")
+    
+    if registered_commands is None:
+        registered_commands = set()
+    
+    register_commands(bot, registered_commands)
+    
+    # Register event handlers
+    bot.add_listener(on_message_handler, "on_message")
+    
+    logger.info("Example module setup complete")
+    return registered_commands
+
+def teardown(bot):
+    logger.info("Cleaning up example module")
+    
+    # Remove event handlers
+    bot.remove_listener(on_message_handler, "on_message")
+    
+    logger.info("Example module cleanup complete")
+
+async def on_message_handler(message):
+    # Event handler implementation
+    pass
+```
+
+### ❌ Bad Module Example
+```python
+# Bad module implementation
+def setup(bot, registered_commands=None):
+    # No initialization of registered_commands
+    # Directly registering commands without checking
+    @bot.tree.command(name="example", description="Example command")
+    async def example(interaction):
+        await interaction.response.send_message("Example response")
+    
+    # No return of registered_commands
+
+# Missing teardown function
+```
+
+## Notes
+- WARNING: Always implement proper teardown to prevent resource leaks
+- NOTE: Keep modules focused on specific functionality
+- PERF: Consider the performance impact of event handlers
+
+## Tags
+#module-architecture #extensibility #command-registration 

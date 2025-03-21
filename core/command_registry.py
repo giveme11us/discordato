@@ -1,15 +1,104 @@
 """
-Command Registry
-
-This module provides a central registry for all commands in the bot.
-It ensures that commands are properly registered and synced.
+path: core/command_registry.py
+purpose: Provides a central registry for all commands in the bot
+critical:
+- Ensures commands are properly registered and synced
+- Prevents duplicate command registration
+- Maintains command metadata
 """
 
 import logging
 import discord
 from discord import app_commands
+from typing import Dict, Set, Optional
+from .commands.base import BaseCommand
 
 logger = logging.getLogger('discord_bot.command_registry')
+
+class CommandRegistry:
+    """Central registry for all bot commands."""
+    
+    def __init__(self):
+        """Initialize the command registry."""
+        self._commands: Dict[str, BaseCommand] = {}
+        self._registered_commands: Set[str] = set()
+        
+    def register_command(self, command: BaseCommand) -> None:
+        """
+        Register a new command.
+        
+        Args:
+            command: The command to register
+            
+        Raises:
+            ValueError: If command with same name already exists
+        """
+        if command.name in self._commands:
+            raise ValueError(f"Command '{command.name}' is already registered")
+            
+        self._commands[command.name] = command
+        logger.info(f"Registered command: {command.name}")
+        
+    def get_command(self, name: str) -> Optional[BaseCommand]:
+        """
+        Get a registered command by name.
+        
+        Args:
+            name: The name of the command
+            
+        Returns:
+            The command if found, None otherwise
+        """
+        return self._commands.get(name)
+        
+    def register_with_bot(self, bot: discord.Client) -> None:
+        """
+        Register all commands with the Discord bot.
+        
+        Args:
+            bot: The Discord bot instance
+        """
+        for command in self._commands.values():
+            try:
+                app_command = command.to_app_command()
+                bot.tree.add_command(app_command)
+                self._registered_commands.add(command.name)
+                logger.info(f"Registered command with Discord: {command.name}")
+            except Exception as e:
+                logger.error(f"Failed to register command {command.name}: {e}")
+                
+    @property
+    def registered_commands(self) -> Set[str]:
+        """Get the set of registered command names."""
+        return self._registered_commands.copy()
+        
+    def __len__(self) -> int:
+        """Get the number of registered commands."""
+        return len(self._commands)
+        
+    def __iter__(self):
+        """Iterate over registered commands."""
+        return iter(self._commands.values())
+
+# Global registry instance
+registry = CommandRegistry()
+
+def register_all_commands(bot: discord.Client) -> None:
+    """
+    Register all commands with the bot.
+    This ensures that commands are properly registered before syncing.
+    
+    Args:
+        bot: The Discord bot instance
+    """
+    logger.info("Registering all commands centrally")
+    
+    try:
+        # Register commands with Discord
+        registry.register_with_bot(bot)
+        logger.info(f"Successfully registered {len(registry)} commands")
+    except Exception as e:
+        logger.error(f"Error registering commands: {e}")
 
 def register_all_commands(bot):
     """

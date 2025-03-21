@@ -3,4 +3,136 @@ description:
 globs: 
 alwaysApply: true
 ---
-From now on when we reference to the project local documentation we will indicate the files inside this path: "data/docs" when i will ask to documentate something please generate/edits/read files in this folder,the only expectactions is the readme file which is the project root folder
+# Rule Name: Project Overview - Discord Bot Framework
+Version: 1.0.0
+Last Updated: 2024-03-20
+Tags: #project-context #architecture #framework
+
+## Purpose
+Provides essential context about the Discord bot project's architecture, design philosophy, and core components to enable better understanding and context-aware suggestions.
+
+## Project Context
+
+### Core Architecture
+- **Modular Discord Bot System**: A flexible framework supporting multiple operational modes (Single Bot, Multi-Bot, Partial Mode)
+- **Technology Stack**: Python-based Discord bot using discord.py library
+- **Design Philosophy**: Emphasizes modularity, configurability, and maintainable code structure
+
+### Key Components
+1. **Core Framework**
+   - Bot Manager: Handles initialization and lifecycle
+   - Command Router: Routes commands to appropriate modules
+   - Command Registry: Central command management
+   - Command Sync: Manages Discord slash command registration
+
+2. **Module System**
+   - Independent functional modules
+   - Plug-and-play architecture
+   - Role-based access control
+   - Configuration management per module
+
+3. **Primary Features**
+   - Slash Command Support
+   - Comprehensive Logging
+   - Environment-based Configuration
+   - Multiple Operational Modes
+
+### Critical Modules
+1. **Pinger System**
+   - Monitors @everyone and @here mentions
+   - Notification system with whitelist
+   - Configurable channel routing
+
+2. **Reaction Systems**
+   - Forward System: Message forwarding via reactions
+   - Link Reaction: Store-specific link detection
+   - Product ID extraction capabilities
+
+3. **Keyword Filter**
+   - Regex-based content monitoring
+   - Configurable actions and severity levels
+   - Channel-specific filtering
+
+4. **Redeye Module**
+   - Profile and task management
+   - CSV integration
+   - Role-based access control
+
+## Code Organization
+
+### Directory Structure
+```
+discord_bot_project/
+├── discord_bot.py        # Entry point
+├── core/                 # Core framework
+├── cogs/                 # Discord.py cogs
+├── modules/             # Functional modules
+├── utils/               # Utility functions
+└── tests/              # Test files
+```
+
+### Configuration Approach
+- Environment-based (.env files)
+- Module-specific settings
+- Role-based permissions
+- Feature flags
+
+## Development Guidelines
+
+### Code Style
+- Prefer explicit over implicit
+- Maintain modular architecture
+- Follow single responsibility principle
+- Implement comprehensive error handling
+
+### Feature Implementation
+- Use slash commands for interactions
+- Implement role-based access control
+- Provide configuration options
+- Include logging and monitoring
+
+### Testing Requirements
+- Unit tests for core functionality
+- Integration tests for modules
+- Command registration verification
+- Configuration validation
+
+## Critical Considerations
+
+### Security
+- Token management
+- Permission systems
+- Input validation
+- Rate limiting
+
+### Performance
+- Asynchronous operations
+- Resource management
+- Cache utilization
+- Command throttling
+
+### Scalability
+- Module independence
+- Configuration flexibility
+- Resource optimization
+- Error resilience
+
+## Documentation Management
+- All project documentation must reside in `data/docs/`
+- Exception: README.md remains in project root
+- Each module requires its own documentation file
+- When adding features, update corresponding documentation
+
+## Code Documentation Standards
+- All functions must include comprehensive docstrings
+- Code should include TODO lists for in-progress features
+- Implementation status must be clearly marked
+- Next steps and future considerations should be documented
+
+## Notes
+- WARNING: Always maintain modular structure when adding features
+- NOTE: Configuration should be environment-based
+- PERF: Consider Discord API rate limits in implementations
+
+## Tags
+#discord-bot #modular-architecture #python #framework 

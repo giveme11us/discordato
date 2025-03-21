@@ -1,0 +1,148 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule Name: Command Implementation Guidelines
+Version: 1.0.0
+Last Updated: 2024-03-20
+Tags: #commands #implementation #best-practices
+
+## Purpose
+Defines the standard process for implementing new commands in the Discord bot, ensuring consistent registration, structure, and behavior across all modules.
+
+## Critical Requirements
+- All commands must use Discord's slash command system
+- Commands must be registered in the central registry to prevent duplicates
+- Each command must follow the established pattern for its module
+- Command implementations must include proper error handling
+
+## Command Structure
+
+### Registration Process
+1. **Central Registry**
+   - All commands must be registered in `core/command_sync.py`
+   - Check for existing command registration before adding new ones
+   - Use the registered_commands set to track command registration
+
+2. **Command Definition**
+   - Use Discord.py's tree command decorator
+   - Include descriptive name and description
+   - Define appropriate parameters with types
+   - Implement permission checks
+
+3. **Command Handler**
+   - Separate command definition from implementation
+   - Use dedicated handler functions for logic
+   - Implement proper error handling
+
+## Implementation Guidelines
+
+### Command File Structure
+```python
+# Command handler implementation
+async def command_handler(interaction):
+    # Command implementation
+    pass
+
+# Command registration function
+def setup_command(bot):
+    @bot.tree.command(
+        name="command_name",
+        description="Command description"
+    )
+    async def command(interaction):
+        await command_handler(interaction)
+```
+
+### Module Integration
+```python
+def setup(bot, registered_commands=None):
+    # Initialize registered_commands if not provided
+    if registered_commands is None:
+        registered_commands = set()
+        
+    # Register commands if not already registered
+    if 'command_name' not in registered_commands:
+        # Register your command
+        pass
+
+def teardown(bot):
+    # Clean up resources
+    pass
+```
+
+### Best Practices
+- Keep command handlers focused on a single responsibility
+- Implement appropriate permission checks
+- Provide helpful error messages
+- Use ephemeral responses for sensitive information
+- Include command options with descriptive names
+- Follow consistent naming conventions
+
+## Command Types
+
+### Slash Commands
+- Primary command type for all new features
+- Must include descriptive options
+- Should provide immediate feedback
+
+### Context Menu Commands
+- Use for actions that apply to messages or users
+- Limit to simple, focused operations
+- Ensure clear naming for intuitive use
+
+### Message Components
+- Use buttons and select menus for interactive responses
+- Limit lifetime of components to prevent stale interactions
+- Implement appropriate timeout handling
+
+## Testing Requirements
+- Verify command registration
+- Test permission boundaries
+- Validate parameter handling
+- Check error conditions
+- Confirm expected behavior
+
+## Examples
+
+### ✅ Good Example
+```python
+async def ping_handler(interaction):
+    """
+    Responds with the bot's latency.
+    """
+    latency = round(interaction.client.latency * 1000)
+    await interaction.response.send_message(f"Pong! {latency}ms")
+
+def setup_command(bot):
+    @bot.tree.command(
+        name="ping",
+        description="Check the bot's response time"
+    )
+    async def ping(interaction):
+        await ping_handler(interaction)
+```
+
+### ❌ Bad Example
+```python
+def setup_command(bot):
+    @bot.tree.command(
+        name="do_thing",
+        description="Does a thing"
+    )
+    async def do_thing(interaction):
+        # Logic directly in the command definition
+        # No error handling
+        # Vague naming and description
+        result = some_function()
+        await interaction.response.send_message(result)
+```
+
+## Notes
+- WARNING: Always check for command name collisions
+- NOTE: Commands should provide clear feedback on success or failure
+- PERF: Consider command throttling for resource-intensive operations
+
+## Tags
+#slash-commands #command-registration #discord-interactions 

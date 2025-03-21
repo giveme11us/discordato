@@ -1,0 +1,208 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule Name: Configuration Management
+Version: 1.0.0
+Last Updated: 2024-03-20
+Tags: #configuration #environment #settings
+
+## Purpose
+Establishes the standard approach for managing configurations within the Discord bot project, ensuring consistent, secure, and maintainable settings across all modules.
+
+## Critical Requirements
+- All configuration must be environment-based using .env files
+- Sensitive data must never be hardcoded in the codebase
+- Each module must have its own clearly defined configuration section
+- Configuration changes must be available through both commands and .env file
+
+## Configuration Structure
+
+### Environment Variables
+1. **Core Bot Configuration**
+   ```env
+   # Main bot token (required)
+   DISCORD_BOT_TOKEN=your_token_here
+   
+   # Application ID (required for slash commands)
+   APPLICATION_ID=your_app_id_here
+   
+   # Guild IDs for development
+   GUILD_IDS=guild_id1,guild_id2
+   
+   # Enabled modules
+   ENABLED_MODULES=mod,online,instore,redeye
+   ```
+
+2. **Module-Specific Configuration**
+   ```env
+   # Pinger Feature Settings
+   PINGER_NOTIFICATION_CHANNEL_ID=969208183799296030
+   PINGER_WHITELIST_ROLE_IDS=811975979492704337,811975812596498482
+   PINGER_MONITOR_EVERYONE=True
+   PINGER_MONITOR_HERE=True
+   PINGER_MONITOR_ROLES=True
+   ```
+
+3. **Global Settings**
+   ```env
+   # Global Embed Customization Settings
+   EMBED_COLOR=00ff1f
+   EMBED_FOOTER_TEXT=Discord Bot
+   EMBED_FOOTER_ICON_URL=https://example.com/footer-icon.png
+   EMBED_THUMBNAIL_URL=https://example.com/thumbnail.png
+   EMBED_DEFAULT_TITLE=Notification
+   EMBED_INCLUDE_TIMESTAMP=True
+   ```
+
+### Configuration Access Patterns
+
+#### Loading Configuration
+```python
+# Environment-based configuration loading
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Access configuration
+token = os.getenv("DISCORD_BOT_TOKEN")
+enabled_modules = os.getenv("ENABLED_MODULES", "mod,online").split(",")
+```
+
+#### Settings Manager Pattern
+```python
+class SettingsManager:
+    def __init__(self):
+        self.settings = {}
+        self.load_from_env()
+    
+    def load_from_env(self):
+        # Load settings from environment
+        pass
+        
+    def get_setting(self, key, default=None):
+        return self.settings.get(key, default)
+        
+    def update_setting(self, key, value):
+        # Update setting and persist to .env
+        self.settings[key] = value
+        self._persist_settings()
+```
+
+## Configuration Commands
+
+### Structure
+- Every configurable module should have a top-level config command
+- Config commands should support viewing current settings
+- Config commands must implement appropriate permission checks
+- Changes made through commands must update the .env file
+
+### Example Command
+```python
+@bot.tree.command(
+    name="pinger-config",
+    description="Configure the pinger notification system"
+)
+async def pinger_config(
+    interaction: discord.Interaction,
+    channel: discord.TextChannel = None,
+    everyone: bool = None,
+    here: bool = None,
+    roles: bool = None
+):
+    # Permission check
+    if not is_admin(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command", ephemeral=True)
+        return
+        
+    # Update settings if provided
+    settings_updated = False
+    if channel is not None:
+        update_env_setting("PINGER_NOTIFICATION_CHANNEL_ID", str(channel.id))
+        settings_updated = True
+        
+    # Similar updates for other parameters
+    
+    # Show current configuration
+    config = get_pinger_config()
+    embed = create_config_embed(config)
+    
+    if settings_updated:
+        await interaction.response.send_message("Settings updated", embed=embed, ephemeral=True)
+    else:
+        await interaction.response.send_message("Current configuration", embed=embed, ephemeral=True)
+```
+
+## Implementation Guidelines
+
+### Adding New Configuration
+1. Define environment variables with clear naming:
+   - Use uppercase for all environment variables
+   - Use module name as prefix (e.g., `PINGER_`)
+   - Use descriptive naming for the setting
+   - Document in .env.example file
+
+2. Implement access pattern:
+   - Create getter functions for complex settings
+   - Implement validation for critical settings
+   - Provide sensible defaults
+
+3. Add configuration command:
+   - Implement slash command for viewing/updating
+   - Include permission checks
+   - Persist changes to .env file
+
+### Configuration Persistence
+- Changes made via commands must update the actual .env file
+- Use atomic file operations to prevent corruption
+- Back up existing configuration before modifying
+- Validate new settings before saving
+
+### Security Considerations
+- Never log sensitive configuration (tokens, keys)
+- Implement role-based access for configuration commands
+- Validate all configuration inputs thoroughly
+- Use ephemeral responses for configuration commands
+
+## Examples
+
+### ✅ Good Configuration Example
+```python
+# Well-structured configuration with validation
+def get_pinger_config():
+    config = {
+        "notification_channel_id": os.getenv("PINGER_NOTIFICATION_CHANNEL_ID"),
+        "whitelist_role_ids": os.getenv("PINGER_WHITELIST_ROLE_IDS", "").split(","),
+        "monitor_everyone": os.getenv("PINGER_MONITOR_EVERYONE", "True").lower() == "true",
+        "monitor_here": os.getenv("PINGER_MONITOR_HERE", "True").lower() == "true",
+        "monitor_roles": os.getenv("PINGER_MONITOR_ROLES", "True").lower() == "true",
+    }
+    
+    # Validate and provide defaults
+    if not config["notification_channel_id"]:
+        logger.warning("Pinger notification channel not configured")
+    
+    # Filter empty strings from list
+    config["whitelist_role_ids"] = [r for r in config["whitelist_role_ids"] if r]
+    
+    return config
+```
+
+### ❌ Bad Configuration Example
+```python
+# Direct access without validation or documentation
+notification_channel = os.getenv("PINGER_NOTIFICATION_CHANNEL_ID")
+whitelist = os.getenv("PINGER_WHITELIST_ROLE_IDS").split(",")
+monitor_everyone = os.getenv("PINGER_MONITOR_EVERYONE") == "True"
+```
+
+## Notes
+- WARNING: Never commit tokens or sensitive data to version control
+- NOTE: Always use descriptive variable names and include defaults
+- PERF: Cache frequently accessed configuration values
+
+## Tags
+#environment-variables #settings #configuration-commands #security 

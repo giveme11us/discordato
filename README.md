@@ -1,413 +1,113 @@
 # Discord Bot Project
+Version: 2.0.0
+Last Updated: 2024-03-20
 
-A modular Discord bot system capable of managing multiple functional modules with different configurations.
+## Overview
+A modular Discord bot built with discord.py, featuring a robust command system, comprehensive error handling, and advanced logging capabilities.
 
 ## Features
 
-- **Modular Design**: Easily add new modules and commands without modifying the core framework
-- **Multiple Operational Modes**:
-  - **Single Bot Mode**: One token for all modules
-  - **Multi-Bot Mode**: Different tokens for each module
-  - **Partial Mode**: Only modules with valid tokens are activated
-- **Slash Command Support**: Modern Discord interactions using slash commands
-- **Comprehensive Logging**: Detailed logging for debugging and monitoring
-- **Flexible Configuration**: Environment-based configuration for easy deployment
-- **Command Registration System**: Robust system to prevent duplicate command registration
-- **Pinger Notification System**: Monitors `@everyone` and `@here` mentions and sends notifications to a dedicated channel. A whitelist system allows specific roles to use mentions without triggering notifications. The notification channel and monitoring settings are configurable.
-- **Reaction Forward System**: Automatically adds a ➡️ reaction to messages in specified category channels. This can be used to visually mark messages for forwarding or to indicate that a message requires attention. The categories to monitor are fully configurable.
-- **Message Forwarding System**: Users with whitelisted roles can forward messages to the notification channel by reacting with ➡️. Forwards all types of messages including regular user messages, webhook messages, and app messages. Uses Discord's official message forwarding feature, preserving the original author's name and avatar while showing who forwarded the message and the message source. Attachments and embeds from the original message are also included.
-- **Link Reaction System**: Automatically adds a 🔗 link emoji to messages containing embeds from supported stores (like LUISAVIAROMA) in specified channels. The bot will only add the reaction if it detects content from supported stores, optimizing the user experience by only highlighting relevant content.
-  - **Multi-store Support**: Now uses a dictionary-based configuration system to handle multiple stores with different detection methods and extraction patterns
-  - **Enhanced Detection**: Supports various detection methods including author name, title, URL patterns, and embed field content
-  - **Direct Channel Monitoring**: Configure specific channels to monitor for each store instead of only using categories
-  - **Store Product ID Extraction**: When whitelisted users react with the 🔗 link emoji to embeds from specific stores, the bot extracts product IDs and saves them to configured files:
-    - **LUISAVIAROMA**: Extracts product IDs from embeds with author "LUISAVIAROMA" and saves them to a configured file, with pattern-based extraction from URLs or embed fields
-  - **Specialized Store Commands**: Added `/luisaviaroma_adder` and `/luisaviaroma_remover` commands for easy management of LuisaViaRoma product tracking
-  - **Context Menu Integration**: Includes user context menu commands for quick product ID management
-- **Keyword Filter System**: Automatically monitors messages in specified categories for problematic content using regex patterns.
-  - **Pattern Detection**: Uses regular expressions to match against potential threats and unwanted content
-  - **Configurable Actions**: Each filter can be set to log, notify, or delete matching messages
-  - **Severity Levels**: Categorize threats as low, medium, or high severity
-  - **Detailed Notifications**: Sends comprehensive reports to a notification channel with message details and context
-  - **Dry Run Mode**: Test filters without deletion actions to ensure proper configuration
-  - **Preset Filters**: Comes with preconfigured filters for common threats like Discord scam links and invite links
-  - **Pattern Management**: Add, remove, or modify patterns through slash commands
-  - **Category/Channel Control**: Apply filtering only to specific categories with the ability to blacklist channels
-- **Redeye Module**: A specialized system for managing profiles and tasks with role-based access control.
-  - **Role-Based Access Control**: Dedicated permission system with separate whitelist for the redeye module
-  - **CSV File Integration**: Reads and parses CSV files for profiles and tasks
-  - **Profile Management**: View all profiles with basic information or detailed views of specific profiles
-  - **File Path Configuration**: Configure and update file paths through commands
-  - **Formatted Displays**: Information is displayed in formatted embeds with field grouping
-  - **Webhook Integration**: Support for Discord webhooks in profile configurations
-  - **Personal Information Management**: Structured format for viewing shipping and personal details
-  - **Connection & Proxy Settings**: Manage timeout, delay and connection settings for profiles
-- **Improved Settings Management**: Refactored configuration system to use direct settings manager access instead of property accessors, providing more consistent behavior and better error handling
+### Core Systems
+- **Command System**: Unified command registration and routing
+- **Error Handling**: Centralized error management with custom exceptions
+- **Logging**: Structured logging with rotation and module-specific loggers
 
-## Project Structure
+### Modules
+- **Mod**: Moderation tools and utilities
+- **Online**: Online status tracking
+- **Instore**: Store management features
+- **Redeye**: Profile and task management
 
-```
-discord_bot_project/
-│
-├── discord_bot.py            # Main entry point
-├── .env                      # Environment variables file
-├── config/                   # Configuration settings
-├── core/                     # Core bot framework
-│   ├── bot_manager.py        # Bot initialization and lifecycle manager
-│   ├── command_sync.py       # Handles Discord slash command registration
-│   ├── command_router.py     # Routes commands to appropriate modules
-│   └── command_registry.py   # Central registry for all commands
-├── cogs/                     # Discord.py cogs (extension modules)
-│   ├── keyword_filter_cog.py # Keyword filtering functionality
-│   ├── link_reaction_cog.py  # Link reaction functionality
-│   ├── reaction_forward_cog.py # Reaction forward functionality
-│   └── pinger_cog.py         # Ping notification functionality
-├── modules/                  # Functional modules (legacy architecture)
-│   ├── mod/                  # Moderation module
-│   │   ├── link_reaction/    # Link reaction functionality
-│   │   │   ├── link_reaction.py  # Main link reaction logic
-│   │   │   └── store_manager.py  # Store configuration manager
-│   │   ├── reaction_forward/ # Reaction forward functionality  
-│   │   └── keyword_filter/   # Keyword filter functionality
-│   ├── redeye/               # Redeye module
-│   │   ├── redeye.py         # Main redeye module logic
-│   │   ├── waitlist.py       # Waitlist management functionality
-│   │   └── config_cmd.py     # Redeye configuration commands
-│   ├── online/               # Online interaction module
-│   └── instore/              # In-store interaction module
-├── utils/                    # Utility functions
-└── tests/                    # Test files
-```
+## Setup
 
-## Installation
+### Prerequisites
+- Python 3.8 or higher
+- Discord Developer Account
+- Bot Token and Application ID
 
+### Installation
 1. Clone the repository:
-   ```
-   git clone https://github.com/giveme11us/discordato.git
-   cd discordato
-   ```
+```bash
+git clone https://github.com/yourusername/discord-bot.git
+cd discord-bot
+```
 
 2. Install dependencies:
-   ```
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-3. Create a `.env` file based on the `.env.example` template:
-   ```
-   cp .env.example .env
-   ```
-
-4. Edit the `.env` file with your Discord bot tokens and configuration:
-   ```
-   # Main bot token (required)
-   DISCORD_BOT_TOKEN=your_token_here
-   
-   # Application ID (required for slash commands)
-   APPLICATION_ID=your_app_id_here
-   
-   # Guild IDs for development
-   GUILD_IDS=guild_id1,guild_id2
-   ```
-
-## Usage
-
-### Running the Bot
-
-```
-python discord_bot.py
+```bash
+pip install -r requirements.txt
 ```
 
-### Command Line Arguments
-
-- `--config`: Path to the configuration file (default: `.env`)
-- `--debug`: Enable debug mode for more detailed logging
-
-Example:
-```
-python discord_bot.py --config custom.env --debug
-```
-
-### Registering Commands
-
-The bot automatically registers slash commands when it starts, but you can also manually register them:
-
-```
-python register_commands.py
-```
-
-## Adding New Modules
-
-1. Create a new directory under `modules/`:
-   ```
-   mkdir -p modules/new_module
-   ```
-
-2. Create a `module.py` file with setup and teardown functions:
-   ```python
-   def setup(bot, registered_commands=None):
-       # Initialize registered_commands if not provided
-       if registered_commands is None:
-           registered_commands = set()
-           
-       # Register commands if not already registered
-       if 'command_name' not in registered_commands:
-           # Register your command
-           pass
-   
-   def teardown(bot):
-       # Clean up resources
-       pass
-   ```
-
-3. Add command files to the module directory.
-
-4. Update the `ENABLED_MODULES` setting in your `.env` file.
-
-## Adding New Commands
-
-1. Add the command to the central registry in `core/command_sync.py`:
-   ```python
-   # Register your new command
-   @bot.tree.command(
-       name="command_name",
-       description="Command description"
-   )
-   async def command_name(interaction: discord.Interaction):
-       # Command implementation
-       pass
-   ```
-
-2. Create a command file in the appropriate module directory:
-   ```python
-   async def command_handler(interaction):
-       # Command implementation
-       pass
-   
-   def setup_command(bot):
-       @bot.tree.command(
-           name="command_name",
-           description="Command description"
-       )
-       async def command(interaction):
-           await command_handler(interaction)
-   ```
-
-3. Import and register the command in the module's `module.py` file.
-
-## Troubleshooting
-
-### Command Syncing Issues
-
-If you encounter issues with commands not being synced to Discord:
-
-1. Ensure your bot has the proper permissions:
-   - Go to Discord Developer Portal → Your Application → Bot
-   - Enable "MESSAGE CONTENT INTENT"
-   - Under OAuth2 → URL Generator, select "bot" and "applications.commands" scopes
-
-2. Verify your APPLICATION_ID is correctly set in .env file
-
-3. Try manually syncing commands with the dedicated script:
-   ```
-   python register_commands.py
-   ```
-   This script directly communicates with Discord's API to register commands.
-
-4. If commands still don't appear, try resetting all commands first:
-   ```
-   python reset_commands.py
-   ```
-   This will remove all existing commands, then you can register them again.
-
-5. Check the logs for any errors.
-
-6. Be patient - changes to slash commands can sometimes take up to an hour to propagate in Discord.
-
-## Testing
-
-Run tests using pytest:
-```
-pytest
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Pinger Module
-
-The Pinger module monitors mentions in Discord messages (@everyone, @here, and role mentions) and sends notifications to a designated channel. This helps administrators keep track of important mentions across the server.
-
-### Features
-
-- Monitors @everyone, @here, and role mentions
-- Sends notifications with embed messages to a designated channel
-- Whitelist system ensures only authorized users can trigger notifications
-- Jump button allows quick navigation to the original message
-- Fully configurable through environment variables or the `/pinger-config` command
-
-### Configuration
-
-You can configure the Pinger module in two ways:
-
-1. **Using the `/pinger-config` command** (recommended):
-   - `/pinger-config` - Shows current configuration
-   - `/pinger-config channel #channel-name` - Sets the notification channel
-   - `/pinger-config whitelist add @role` - Adds a role to the whitelist
-   - `/pinger-config whitelist remove @role` - Removes a role from the whitelist
-   - `/pinger-config whitelist clear` - Clears the entire whitelist
-   - `/pinger-config everyone true|false` - Enables/disables @everyone monitoring
-   - `/pinger-config here true|false` - Enables/disables @here monitoring
-   - `/pinger-config roles true|false` - Enables/disables role mention monitoring
-
-   *Note: All changes made via the command will persist in the .env file*
-
-2. **Directly in your `.env` file**:
-   ```env
-   # Pinger Feature Settings
-   # Channel ID where ping notifications will be sent
-   PINGER_NOTIFICATION_CHANNEL_ID=969208183799296030
-   # Comma-separated list of role IDs that CAN trigger notifications
-   PINGER_WHITELIST_ROLE_IDS=811975979492704337,811975812596498482
-   # Whether to monitor @everyone pings
-   PINGER_MONITOR_EVERYONE=True
-   # Whether to monitor @here pings
-   PINGER_MONITOR_HERE=True
-   # Whether to monitor role pings
-   PINGER_MONITOR_ROLES=True
-   ```
-
-### Embed Customization
-
-The notification embeds can be customized using the global embed settings:
-
+3. Create `.env` file:
 ```env
-# Global Embed Customization Settings
-# Single color for all embeds (hex format without the # symbol)
-EMBED_COLOR=00ff1f
-# Footer settings
-EMBED_FOOTER_TEXT=Discord Bot
-EMBED_FOOTER_ICON_URL=https://example.com/footer-icon.png
-# Thumbnail settings
-EMBED_THUMBNAIL_URL=https://example.com/thumbnail.png
-# General settings
-EMBED_DEFAULT_TITLE=Notification
-EMBED_INCLUDE_TIMESTAMP=True
-```
+# Required Configuration
+DISCORD_TOKEN=your_bot_token
+APPLICATION_ID=your_application_id
 
-## Link Reaction Module
-
-The Link Reaction module monitors messages in specified channels and categories for embeds or links from supported stores, and adds a link emoji reaction to them. When a user with the appropriate permissions clicks on this reaction, the bot extracts product information and saves it to a file.
-
-### Features
-
-- Monitors messages in specified channels and categories
-- Automatically detects embeds and links from configured stores
-- Adds a customizable link emoji (🔗 by default) to messages with recognized store content
-- Extracts product IDs when users react with the link emoji
-- Saves product IDs to store-specific files for tracking
-- Fully configurable through slash commands or environment variables
-- Multi-store support with customizable detection methods
-
-### Store Configuration
-
-The Link Reaction module supports a dictionary-based store configuration system:
-
-```json
-"STORES": {
-  "luisaviaroma": {
-    "enabled": true,
-    "name": "LUISAVIAROMA",
-    "description": "Extract product IDs from LUISAVIAROMA embeds",
-    "channel_ids": [123456789, 987654321],
-    "detection": {
-      "type": "author_name",
-      "value": "LUISAVIAROMA"
-    },
-    "extraction": {
-      "primary": "url",
-      "pattern": "\\/[^\\/]+\\/([^\\/]+)$",
-      "fallback": "field_pid"
-    },
-    "file_path": "/path/to/luisaviaroma_ids.txt"
-  }
-}
-```
-
-### Configuration Commands
-
-- **Using the `/link-reaction` command**:
-  - `/link-reaction` - Shows current configuration for all stores
-  - `/link-reaction store_name:StoreName` - Shows configuration for a specific store
-  
-- **Using the `/luisaviaroma_adder` command**:
-  - `/luisaviaroma_adder` - Shows current LuisaViaRoma configuration
-  - `/luisaviaroma_adder channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
-
-- **Using the `/luisaviaroma_remover` command**:
-  - `/luisaviaroma_remover` - Shows current LuisaViaRoma configuration
-  - `/luisaviaroma_remover pid:ABC123` - Removes the specified product ID from the tracking file
-  - `/luisaviaroma_remover channel_ids:123456789,987654321 file_path:/path/to/file.txt` - Configures the LuisaViaRoma store with specific channels and file path
-  
-- **Using context menu commands**:
-  - Right-click on a user who posted a product ID and select "Remove PID" - Removes the most recent PID posted by that user
-  - All command responses are sent as direct messages to the user who triggered the action
-
-## Redeye Module
-
-The Redeye module provides functionality for viewing and managing profiles from CSV files.
-
-### Features
-
-- **CSV File Integration**: Reads and parses CSV files for profiles and tasks
-- **Role-Based Access Control**: Dedicated permission system with separate whitelist for the redeye module
-- **Hardcoded File Paths**: File paths are hardcoded in environment variables for security
-- **Profile Viewing**: View all profiles or detailed information for specific profiles
-- **Formatted Displays**: Information is displayed in formatted embeds with field grouping
-
-### Configuration
-
-You can configure the Redeye module using environment variables:
-
-```env
-# Enable the redeye module
+# Optional Configuration
+GUILD_IDS=guild_id1,guild_id2
 ENABLED_MODULES=mod,online,instore,redeye
 
-# Whitelist roles that can access redeye module commands
-REDEYE_WHITELIST_ROLE_IDS=811975979492704337,969204849101119528
-
-# Hardcoded file paths for CSV files
-REDEYE_PROFILES_PATH=/path/to/profiles.csv
-REDEYE_TASKS_PATH=/path/to/tasks.csv
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+LOG_FILE=logs/discord_bot.log
+LOG_MAX_SIZE=5242880  # 5MB
+LOG_BACKUP_COUNT=5
 ```
 
-### Commands
-
-- `/redeye-profiles` - View all profiles with basic information
-- `/redeye-profiles profile_name:NAME` - View detailed information for a specific profile
-
-For detailed documentation, see the [Redeye Module Documentation](data/docs/redeye-module.md).
-
-# Quick Start
-
+4. Run the bot:
 ```bash
-# Navigate to your project directory
-cd your_project_directory
-
-# Create a virtual environment
-python -m venv .venv
-
-# Activate the virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the bot
 python discord_bot.py
-
-# When done, deactivate the environment
-deactivate
 ```
+
+## Project Structure
+```
+discord_bot/
+├── core/               # Core framework
+│   ├── commands/      # Command system
+│   ├── error_handler/ # Error handling
+│   └── logging/       # Logging system
+├── modules/           # Feature modules
+├── data/             # Data storage
+│   └── docs/         # Documentation
+├── logs/             # Log files
+├── tests/            # Test files
+├── .env              # Configuration
+└── README.md         # This file
+```
+
+## Documentation
+- [Phase 2 Completion](data/docs/phase2_completion.md): Details about completed code quality improvements
+- [Command System](data/docs/command_system.md): Guide to using the command system
+- [Error Handling](data/docs/error_handling.md): Error handling documentation
+- [Logging System](data/docs/logging.md): Logging system guide
+
+## Development Status
+- ✅ Phase 2: Code Quality Improvements
+- 🔄 Phase 3: Testing Infrastructure (In Progress)
+- 📅 Phase 4: Documentation (Planned)
+- 📅 Phase 5: Security & Performance (Planned)
+- 📅 Phase 6: Maintenance & Monitoring (Planned)
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## Best Practices
+- Follow the standardized command structure
+- Use appropriate error handling
+- Implement proper logging
+- Write tests for new features
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+- discord.py team for the excellent library
+- Contributors and testers
+
+## Contact
+- GitHub Issues for bug reports and feature requests
+- Project maintainers for other inquiries
