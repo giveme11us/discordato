@@ -15,7 +15,6 @@ The Mod module provides moderation and server management functionality for Disco
 ### Message Moderation
 - Message deletion
 - Bulk message clearing
-- Content filtering
 - Mention monitoring
 
 ### Server Management

@@ -6,7 +6,7 @@ import logging
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch, call
-from core.logging import LogManager, LogHandler, LogLevel, LogError
+from core.log_config import LogManager, LogHandler, LogLevel, LogError
 
 @pytest.mark.unit
 class TestLoggingSystem:

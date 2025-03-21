@@ -1,275 +1,159 @@
 """
 path: modules/mod/reaction/__init__.py
-purpose: Manages reaction-based message forwarding and product link detection
+purpose: Manages automatic embed forwarding from whitelisted categories
 critical:
-- Requires channel configuration
-- Handles reaction-based forwarding
-- Manages product link detection
+- Uses environment variables for configuration
+- Automatically adds reactions to messages with embeds in whitelisted categories
+- Forwards embeds to configured channel when reacted to
 """
 
 import os
 import logging
 import discord
-from discord import app_commands
-from discord.ext import commands
-from typing import Optional
 
 logger = logging.getLogger('discord_bot.mod.reaction')
 
 # Default configuration
 REACTION_CONFIG = {
-    "ENABLED": False,
-    "CATEGORY_IDS": [],
-    "MONITOR_CHANNEL_IDS": [],
-    "FORWARD_EMOJI": "➡️",
-    "NOTIFICATION_CHANNEL_ID": None
+    "ENABLED": True,
+    "FORWARD_EMOJI": "➡️",  # Default forward emoji
+    "FORWARD_CHANNEL_ID": None  # Channel to forward messages to
 }
 
-async def setup(bot):
-    """
-    Set up the reaction module.
-    
-    Args:
-        bot: The Discord bot instance
-    """
-    # Register reaction command group
-    reaction_group = app_commands.Group(name="reaction", description="Manage reaction settings")
-    
-    @reaction_group.command(name="enable")
-    @app_commands.describe(
-        channel="Channel to enable reactions in",
-        category="Category to enable reactions in"
-    )
-    async def reaction_enable(
-        interaction: discord.Interaction,
-        channel: Optional[discord.TextChannel] = None,
-        category: Optional[discord.CategoryChannel] = None
-    ):
-        # Check if user has moderator role
-        if not any(role.id in bot.config.MOD_WHITELIST_ROLE_IDS for role in interaction.user.roles):
-            await interaction.response.send_message(
-                "You need moderator permissions to use this command.",
-                ephemeral=True
-            )
+def load_config():
+    """Load configuration from environment variables."""
+    forward_channel_id = os.getenv("REACTION_FORWARD_CHANNEL_ID")
+    if forward_channel_id:
+        try:
+            REACTION_CONFIG["FORWARD_CHANNEL_ID"] = int(forward_channel_id)
+            logger.info(f"Loaded forward channel ID: {REACTION_CONFIG['FORWARD_CHANNEL_ID']}")
+        except ValueError:
+            logger.error(f"Invalid forward channel ID: {forward_channel_id}")
+    else:
+        logger.warning("No forward channel configured! Please set REACTION_FORWARD_CHANNEL_ID in .env")
+
+def get_whitelisted_categories():
+    """Get whitelisted category IDs from environment."""
+    category_ids_str = os.getenv("REACTION_WHITELISTED_CATEGORIES", "")
+    logger.info(f"Reading whitelisted categories from env: {category_ids_str}")
+    if not category_ids_str:
+        return []
+    try:
+        categories = [int(cat_id.strip()) for cat_id in category_ids_str.split(",") if cat_id.strip()]
+        logger.info(f"Parsed whitelisted categories: {categories}")
+        return categories
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error parsing whitelisted categories: {e}")
+        return []
+
+async def handle_message(message):
+    """Handle message events for adding reactions."""
+    try:
+        # Skip DM messages
+        if not isinstance(message.channel, discord.TextChannel):
             return
-        
-        if channel:
-            if channel.id not in REACTION_CONFIG["MONITOR_CHANNEL_IDS"]:
-                REACTION_CONFIG["MONITOR_CHANNEL_IDS"].append(channel.id)
-            await interaction.response.send_message(
-                f"Enabled reactions in {channel.mention}",
-                ephemeral=True
-            )
-        elif category:
-            if category.id not in REACTION_CONFIG["CATEGORY_IDS"]:
-                REACTION_CONFIG["CATEGORY_IDS"].append(category.id)
-            await interaction.response.send_message(
-                f"Enabled reactions in category {category.name}",
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                "Please specify a channel or category.",
-                ephemeral=True
-            )
-    
-    @reaction_group.command(name="disable")
-    @app_commands.describe(
-        channel="Channel to disable reactions in",
-        category="Category to disable reactions in"
-    )
-    async def reaction_disable(
-        interaction: discord.Interaction,
-        channel: Optional[discord.TextChannel] = None,
-        category: Optional[discord.CategoryChannel] = None
-    ):
-        # Check if user has moderator role
-        if not any(role.id in bot.config.MOD_WHITELIST_ROLE_IDS for role in interaction.user.roles):
-            await interaction.response.send_message(
-                "You need moderator permissions to use this command.",
-                ephemeral=True
-            )
+            
+        # Skip if message is in the forward channel
+        if REACTION_CONFIG["FORWARD_CHANNEL_ID"] and message.channel.id == REACTION_CONFIG["FORWARD_CHANNEL_ID"]:
             return
-        
-        if channel:
-            if channel.id in REACTION_CONFIG["MONITOR_CHANNEL_IDS"]:
-                REACTION_CONFIG["MONITOR_CHANNEL_IDS"].remove(channel.id)
-            await interaction.response.send_message(
-                f"Disabled reactions in {channel.mention}",
-                ephemeral=True
-            )
-        elif category:
-            if category.id in REACTION_CONFIG["CATEGORY_IDS"]:
-                REACTION_CONFIG["CATEGORY_IDS"].remove(category.id)
-            await interaction.response.send_message(
-                f"Disabled reactions in category {category.name}",
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                "Please specify a channel or category.",
-                ephemeral=True
-            )
-    
-    @reaction_group.command(name="settings")
-    async def reaction_settings(interaction: discord.Interaction):
-        # Check if user has moderator role
-        if not any(role.id in bot.config.MOD_WHITELIST_ROLE_IDS for role in interaction.user.roles):
-            await interaction.response.send_message(
-                "You need moderator permissions to use this command.",
-                ephemeral=True
-            )
-            return
-        
-        embed = discord.Embed(
-            title="Reaction Settings",
-            color=int(os.getenv('EMBED_COLOR', '000000'), 16)
-        )
-        
-        # Add enabled status
-        embed.add_field(
-            name="Status",
-            value="Enabled" if REACTION_CONFIG["ENABLED"] else "Disabled",
-            inline=False
-        )
-        
-        # Add monitored channels
-        monitored_channels = []
-        for channel_id in REACTION_CONFIG["MONITOR_CHANNEL_IDS"]:
-            channel = interaction.guild.get_channel(channel_id)
-            if channel:
-                monitored_channels.append(channel.mention)
-        
-        embed.add_field(
-            name="Monitored Channels",
-            value="\n".join(monitored_channels) if monitored_channels else "None",
-            inline=False
-        )
-        
-        # Add monitored categories
-        monitored_categories = []
-        for category_id in REACTION_CONFIG["CATEGORY_IDS"]:
-            category = interaction.guild.get_channel(category_id)
-            if category:
-                monitored_categories.append(category.name)
-        
-        embed.add_field(
-            name="Monitored Categories",
-            value="\n".join(monitored_categories) if monitored_categories else "None",
-            inline=False
-        )
-        
-        # Add forward emoji
-        embed.add_field(
-            name="Forward Emoji",
-            value=REACTION_CONFIG["FORWARD_EMOJI"],
-            inline=False
-        )
-        
-        # Add notification channel
-        notification_channel = None
-        if REACTION_CONFIG["NOTIFICATION_CHANNEL_ID"]:
-            notification_channel = interaction.guild.get_channel(REACTION_CONFIG["NOTIFICATION_CHANNEL_ID"])
-        
-        embed.add_field(
-            name="Notification Channel",
-            value=notification_channel.mention if notification_channel else "Not set",
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    # Add the reaction command group to the bot
-    bot.tree.add_command(reaction_group)
-    logger.info("Registered reaction commands")
-    
-    # Register reaction listener
-    @bot.event
-    async def on_raw_reaction_add(payload):
-        # Skip bot reactions
-        if payload.member.bot:
-            return
-        
-        # Skip if reactions are disabled
+            
+        # Skip if not enabled
         if not REACTION_CONFIG["ENABLED"]:
             return
-        
-        # Get the channel
-        channel = bot.get_channel(payload.channel_id)
-        if not channel:
+            
+        # Skip if not in a category
+        if not message.channel.category:
             return
-        
-        # Check if channel is monitored
-        if (channel.id not in REACTION_CONFIG["MONITOR_CHANNEL_IDS"] and
-            (not channel.category or channel.category.id not in REACTION_CONFIG["CATEGORY_IDS"])):
+            
+        # Get whitelisted categories
+        whitelisted_categories = get_whitelisted_categories()
+        if not whitelisted_categories:
             return
+            
+        # Skip if category not whitelisted
+        if message.channel.category.id not in whitelisted_categories:
+            return
+            
+        # Skip if message has no embeds
+        if not message.embeds:
+            return
+            
+        # Add forward reaction
+        await message.add_reaction(REACTION_CONFIG["FORWARD_EMOJI"])
+        logger.info(f"Added reaction to message {message.id} in {message.channel.name} (has {len(message.embeds)} embeds)")
         
-        # Check if it's the forward emoji
+    except Exception as e:
+        logger.error(f"Error in handle_message: {e}", exc_info=True)
+
+async def setup(bot):
+    """Set up the reaction module."""
+    logger.info("Setting up reaction module")
+    
+    # Load configuration
+    load_config()
+    
+    # Register message handler
+    @bot.listen('on_message')
+    async def on_message_reaction(message):
+        await handle_message(message)
+                
+    # Register reaction handler
+    @bot.listen('on_raw_reaction_add')
+    async def on_raw_reaction_add(payload):
+        # Skip bot reactions
+        if payload.user_id == bot.user.id:
+            return
+            
+        # Skip if not enabled or no forward channel configured
+        if not REACTION_CONFIG["ENABLED"]:
+            logger.info("Reaction module disabled")
+            return
+            
+        if not REACTION_CONFIG["FORWARD_CHANNEL_ID"]:
+            logger.warning("No forward channel configured! Please set REACTION_FORWARD_CHANNEL_ID in .env")
+            return
+            
+        # Skip if not the forward emoji
         if str(payload.emoji) != REACTION_CONFIG["FORWARD_EMOJI"]:
             return
-        
+            
         try:
+            # Get the source channel and message
+            source_channel = bot.get_channel(payload.channel_id)
+            if not source_channel or not source_channel.category:
+                return
+                
+            # Skip if category not whitelisted
+            whitelisted_categories = get_whitelisted_categories()
+            if not whitelisted_categories or source_channel.category.id not in whitelisted_categories:
+                return
+                
             # Get the message
-            message = await channel.fetch_message(payload.message_id)
-            
-            # Get the notification channel
-            if not REACTION_CONFIG["NOTIFICATION_CHANNEL_ID"]:
+            message = await source_channel.fetch_message(payload.message_id)
+            if not message or not message.embeds:
                 return
-            
-            notification_channel = bot.get_channel(REACTION_CONFIG["NOTIFICATION_CHANNEL_ID"])
-            if not notification_channel:
+                
+            # Get the forward channel
+            forward_channel = bot.get_channel(REACTION_CONFIG["FORWARD_CHANNEL_ID"])
+            if not forward_channel:
+                logger.error(f"Could not find forward channel {REACTION_CONFIG['FORWARD_CHANNEL_ID']}")
                 return
+                
+            # Forward the embeds
+            logger.info(f"Forwarding {len(message.embeds)} embeds from message {message.id} to {forward_channel.name}")
+            for embed in message.embeds:
+                new_embed = discord.Embed.from_dict(embed.to_dict())
+                new_embed.add_field(
+                    name="Source",
+                    value=f"[Jump to message]({message.jump_url})"
+                )
+                await forward_channel.send(embed=new_embed)
+                
+            logger.info(f"Successfully forwarded {len(message.embeds)} embeds to {forward_channel.name}")
             
-            # Create forward embed
-            embed = discord.Embed(
-                title="Message Forwarded",
-                description=message.content,
-                color=int(os.getenv('EMBED_COLOR', '000000'), 16)
-            )
-            
-            embed.add_field(
-                name="Author",
-                value=f"{message.author.mention} ({message.author.name})",
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Channel",
-                value=message.channel.mention,
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Forwarded by",
-                value=f"{payload.member.mention} ({payload.member.name})",
-                inline=True
-            )
-            
-            # Add message link
-            embed.add_field(
-                name="Original Message",
-                value=f"[Click here]({message.jump_url})",
-                inline=False
-            )
-            
-            # Forward any attachments
-            files = []
-            for attachment in message.attachments:
-                try:
-                    files.append(await attachment.to_file())
-                except Exception as e:
-                    logger.error(f"Error downloading attachment: {e}")
-            
-            await notification_channel.send(embed=embed, files=files)
-            logger.info(f"Forwarded message {message.id} to {notification_channel.name}")
-            
-        except discord.NotFound:
-            logger.error(f"Message {payload.message_id} not found")
-        except discord.Forbidden:
-            logger.error("Missing permissions to forward message")
         except Exception as e:
-            logger.error(f"Error forwarding message: {e}")
+            logger.error(f"Error forwarding message {payload.message_id}: {e}", exc_info=True)
 
 async def teardown(bot):
     """Clean up the reaction module."""
-    pass 
+    logger.info("Reaction module teardown complete") 

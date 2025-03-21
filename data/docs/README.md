@@ -6,7 +6,6 @@ A powerful Discord bot designed to enhance server management with features inclu
 ## Key Features
 
 ### Moderation
-- Keyword filtering with customizable rules
 - Automated message monitoring
 - Role-based access control
 - Notification system for moderators
@@ -65,4 +64,35 @@ For support, please:
 ## Acknowledgments
 - Discord.py team
 - All contributors
-- Community feedback and support 
+- Community feedback and support
+
+## Features
+
+- Message forwarding with reactions
+- Link detection and reactions
+- Mention monitoring
+- Role-based access control
+- Comprehensive logging
+- Configuration management
+
+## Modules
+
+- **Moderation**: Server moderation tools
+- **Link Reaction**: Store link detection and reactions
+- **Pinger**: Mention monitoring and notifications
+- **Redeye**: Role-based waitlist system
+
+## Configuration
+
+All configuration is managed through:
+- Environment variables (`.env`)
+- JSON configuration files
+- Discord slash commands
+
+## Development
+
+See the development guides for:
+- Adding new features
+- Creating commands
+- Managing configuration
+- Testing and deployment 

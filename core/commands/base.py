@@ -11,6 +11,7 @@ import logging
 from typing import List, Optional, Union
 import discord
 from discord import app_commands
+from ..permissions import permission_manager, Permission
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class BaseCommand:
         name: str,
         description: str,
         permissions: Optional[List[str]] = None,
-        guild_only: bool = False
+        guild_only: bool = True  # Changed default to True since most commands need guild context
     ):
         self.name = name
         self.description = description
@@ -48,9 +49,6 @@ class BaseCommand:
             
         Returns:
             bool: Whether the command can proceed
-            
-        Raises:
-            PermissionError: If user lacks required permissions
         """
         if not self.is_enabled:
             await interaction.response.send_message(
@@ -67,10 +65,6 @@ class BaseCommand:
             return False
             
         if not await self.check_permissions(interaction):
-            await interaction.response.send_message(
-                "You don't have permission to use this command.",
-                ephemeral=True
-            )
             return False
             
         return True
@@ -89,7 +83,7 @@ class BaseCommand:
         
     async def check_permissions(self, interaction: discord.Interaction) -> bool:
         """
-        Checks if the user has required permissions.
+        Checks if the user has required permissions using the permission manager.
         
         Args:
             interaction: The Discord interaction
@@ -101,21 +95,33 @@ class BaseCommand:
             return True
             
         if not interaction.guild:
+            await interaction.response.send_message(
+                "This command can only be used in a server.",
+                ephemeral=True
+            )
             return False
             
-        member = interaction.user
-        if not isinstance(member, discord.Member):
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                "Could not verify user permissions.",
+                ephemeral=True
+            )
             return False
             
-        # Check for administrator permission
-        if member.guild_permissions.administrator:
-            return True
+        # Check each required permission
+        missing_permissions = []
+        for permission in self.permissions:
+            if not permission_manager.has_permission(interaction.user, permission):
+                missing_permissions.append(permission)
+                
+        if missing_permissions:
+            await interaction.response.send_message(
+                f"You're missing the following permissions: {', '.join(missing_permissions)}",
+                ephemeral=True
+            )
+            return False
             
-        # Check role permissions
-        member_roles = [role.id for role in member.roles]
-        required_roles = self.permissions
-        
-        return any(str(role_id) in required_roles for role_id in member_roles)
+        return True
         
     def register(self, tree: app_commands.CommandTree) -> None:
         """

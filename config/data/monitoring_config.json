@@ -1,0 +1,22 @@
+{
+    "ENABLED": true,
+    "HEALTH_CHECK_INTERVAL": 300,
+    "METRICS_COLLECTION_INTERVAL": 60,
+    "NOTIFICATION_CHANNEL_ID": null,
+    "ALERT_THRESHOLDS": {
+        "memory_usage_percent": 90,
+        "cpu_usage_percent": 80,
+        "error_rate": 0.1,
+        "response_time_ms": 1000
+    },
+    "METRICS_TO_COLLECT": {
+        "command_usage": true,
+        "error_rates": true,
+        "response_times": true,
+        "memory_usage": true,
+        "cpu_usage": true,
+        "api_latency": true
+    },
+    "RETENTION_DAYS": 30,
+    "version": "1.0.0"
+}

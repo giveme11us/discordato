@@ -1,254 +1,145 @@
-# Features Guide
+# Discord Bot Features
 
-This guide provides a comprehensive overview of all features available in the Discord bot framework.
+## Overview
 
-## Core Features
+This Discord bot provides a range of features for server management and automation.
 
-### Command System
+## Moderation Features
 
-The bot supports both traditional prefix commands and Discord's slash commands:
+### Role Management
+- Whitelist roles for moderation commands
+- Blacklist roles from specific features
+- Granular permission control
 
-#### Slash Commands
-```
-/help - Display help information
-/ping - Check bot latency
-/config - Manage bot configuration
-```
-
-#### Prefix Commands
-```
-!help - Display help information
-!ping - Check bot latency
-!config - Manage configuration
-```
-
-### Module System
-
-The framework supports dynamic loading of modules:
-- Hot-reload capability in development
-- Module-specific configuration
-- Independent module operation
-
-## Available Modules
-
-### Mod Module
-
-Moderation and server management features.
-
-#### Commands
-```
-/mod mute <user> [duration] - Temporarily mute a user
-/mod kick <user> [reason] - Kick a user from the server
-/mod ban <user> [reason] - Ban a user from the server
-/mod clear <amount> - Clear messages in a channel
-```
-
-#### Features
-- Mention monitoring (@everyone, @here)
-- Auto-moderation capabilities
-- Logging of moderation actions
-- Temporary mute/ban support
-
-### Online Module
-
-Online status tracking and notifications.
-
-#### Commands
-```
-/online track <user> - Track user's online status
-/online alert <role> - Set alert role for notifications
-/online status - View current tracking status
-```
-
-#### Features
-- Real-time status monitoring
-- Customizable notifications
-- Role-based alerts
-- Activity logging
-
-### Instore Module
-
-In-store link and product management.
-
-#### Commands
-```
-/instore add <link> - Add store link
-/instore remove <link> - Remove store link
-/instore list - List active store links
-```
-
-#### Features
-- Automatic link detection
-- Product ID extraction
-- Forward system via reactions
-- Store-specific formatting
-
-### Redeye Module
-
-Task and profile management system.
-
-#### Commands
-```
-/redeye profile <action> - Manage profiles
-/redeye task <action> - Manage tasks
-/redeye export - Export data to CSV
-```
-
-#### Features
-- Profile management
-- Task tracking
-- CSV integration
-- Performance monitoring
-
-## Administrative Features
-
-### Configuration Management
-
-Manage bot settings through commands:
-
-```
-/config view - View current settings
-/config set <module> <setting> <value> - Update setting
-/config reset <module> - Reset module settings
-```
-
-### Permission System
-
-Role-based access control:
-- Admin roles
-- Moderator roles
-- User roles
-- Command-specific permissions
+### Command Control
+- Command cooldowns
+- Usage limits
+- Channel-specific restrictions
 
 ### Logging System
+- Comprehensive action logging
+- Configurable log channels
+- Detailed audit trails
 
-Comprehensive logging features:
-- Action logging
-- Error tracking
-- Audit trail
-- Performance metrics
+## Link Reaction System
 
-## Utility Features
+### Link Detection
+- Automatic link detection
+- Configurable reactions
+- Channel-specific settings
 
-### Auto-Response System
+### Link Forwarding
+- Forward links to designated channels
+- Customizable forwarding rules
+- Link categorization
 
-Configure automatic responses:
-- Keyword triggers
-- Regular expression patterns
-- Custom response templates
-- Cooldown settings
+## Mention Monitoring
 
-### Reaction System
+### Ping Tracking
+- Monitor @everyone and @here mentions
+- Role mention tracking
+- User mention statistics
 
-Handle message reactions:
-- Role assignment
-- Message forwarding
-- Content filtering
-- Action triggers
+### Notification System
+- Configurable notification channels
+- Role-based notifications
+- Custom notification formats
 
-### Monitoring System
+## RedEye Mode
 
-Track bot and server metrics:
-- Command usage
-- Error rates
-- Performance stats
-- User activity
+### Quiet Hours
+- Configurable quiet periods
+- Role-based notifications
+- Time zone support
 
-## Development Features
+### Late Night Settings
+- Custom message formatting
+- Role-specific rules
+- Activity monitoring
 
-### Debug Commands
+## Usage Guide
 
-Available in development mode:
+### Setting Up Moderation
 ```
-/debug status - View debug information
-/debug reload - Reload bot modules
-/debug test - Run test commands
+/mod-config - Configure moderation settings
+  options:
+    - whitelist_roles: Add/remove roles
+    - log_channel: Set log channel
+    - enable: Toggle features
 ```
 
-### Hot Reload
+### Managing Link Reactions
+```
+/link-reaction-config - Configure link reactions
+  options:
+    - reactions: Set reaction emojis
+    - channels: Set monitored channels
+    - forward: Configure forwarding
+```
 
-Enable dynamic code updates:
-- Module reloading
-- Command updates
-- Configuration changes
-- No restart required
+### Configuring Mentions
+```
+/pinger-config - Configure mention monitoring
+  options:
+    - notification_channel: Set channel
+    - monitor_roles: Toggle role monitoring
+    - monitor_everyone: Toggle @everyone tracking
+```
 
-## Integration Features
-
-### API Integration
-
-Connect with external services:
-- REST API support
-- Webhook handling
-- Data synchronization
-- External notifications
-
-### Database Integration
-
-Persistent data storage:
-- Settings storage
-- User data
-- Statistics
-- Audit logs
+### RedEye Settings
+```
+/redeye-config - Configure quiet hours
+  options:
+    - quiet_start: Set start time
+    - quiet_end: Set end time
+    - roles: Set affected roles
+```
 
 ## Best Practices
 
-### Command Usage
+1. Start with Basic Setup
+   - Configure essential features
+   - Test in limited channels
+   - Gradually expand usage
 
-1. **Permissions**
-   - Check command permissions
-   - Use appropriate roles
-   - Follow least privilege
+2. Role Management
+   - Use clear role hierarchy
+   - Document role permissions
+   - Regular permission audits
 
-2. **Rate Limiting**
-   - Respect cooldowns
-   - Handle timeouts
-   - Prevent spam
+3. Channel Organization
+   - Group similar channels
+   - Use clear naming
+   - Set appropriate permissions
 
-3. **Error Handling**
-   - Provide clear error messages
-   - Log issues appropriately
-   - Handle edge cases
-
-### Module Management
-
-1. **Configuration**
-   - Use appropriate settings
-   - Document changes
-   - Test modifications
-
-2. **Monitoring**
-   - Watch for errors
-   - Track performance
-   - Monitor usage
-
-3. **Maintenance**
-   - Regular updates
-   - Backup data
-   - Clean old logs
+4. Monitoring
+   - Regular log reviews
+   - Track feature usage
+   - Adjust settings as needed
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Command Failures**
-   - Check permissions
-   - Verify syntax
-   - Review logs
+1. Command Access
+   - Check role permissions
+   - Verify channel settings
+   - Review command cooldowns
 
-2. **Module Problems**
-   - Check configuration
-   - Verify dependencies
-   - Review error messages
+2. Notifications
+   - Check channel permissions
+   - Verify role settings
+   - Test notification flow
 
-3. **Performance Issues**
-   - Monitor resource usage
-   - Check rate limits
-   - Review active features
+3. Feature Settings
+   - Review configuration
+   - Check enabled status
+   - Verify channel setup
 
-## Next Steps
+## Support
 
-1. Review [Configuration Guide](configuration.md)
-2. Set up monitoring
-3. Configure backups
-4. Join support server
+Need help? Contact us:
+1. Check documentation
+2. Join support server
+3. Open GitHub issue
+4. Contact moderators

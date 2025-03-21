@@ -11,6 +11,8 @@ import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
+from modules.features.mod.reaction_forward.reaction_forward import setup_reaction_forward
+from modules.features.mod.link_reaction.link_reaction import setup_link_reaction
 
 logger = logging.getLogger('discord_bot.modules.mod')
 logger.warning("modules/mod/module.py is deprecated and will be removed in a future version. Use cogs instead.")
@@ -19,50 +21,30 @@ logger.warning("modules/mod/module.py is deprecated and will be removed in a fut
 NAME = "mod"
 DESCRIPTION = "Moderation and general utility commands"
 
-def setup(bot, registered_commands=None):
+async def setup(bot):
     """
-    Set up the mod module.
+    Set up all mod features.
     
     Args:
-        bot: The Discord bot to add commands to
-        registered_commands: Set of already registered commands
+        bot: The Discord bot instance
     """
-    logger.warning("modules/mod/__init__.py is deprecated and will be removed in a future version. Use cogs instead.")
+    logger.info("Setting up mod features")
     
-    if registered_commands is None:
-        registered_commands = set()
+    # Set up reaction forward feature
+    try:
+        setup_reaction_forward(bot)
+        logger.info("Set up reaction_forward feature")
+    except Exception as e:
+        logger.error(f"Failed to set up reaction_forward feature: {e}")
     
-    # Import and set up the link reaction feature
-    from modules.features.mod.link_reaction.link_reaction import setup_link_reaction
-    setup_link_reaction(bot)
+    # Set up link reaction feature
+    try:
+        setup_link_reaction(bot)
+        logger.info("Set up link_reaction feature")
+    except Exception as e:
+        logger.error(f"Failed to set up link_reaction feature: {e}")
     
-    # Import and set up the remover feature with user command
-    from modules.features.mod.link_reaction.remover import setup_remover_commands
-    setup_remover_commands(bot)
-    
-    # Import and set up the keyword filter feature
-    from modules.features.mod.keyword_filter.keyword_filter import setup_keyword_filter
-    setup_keyword_filter(bot)
-    
-    # Import and set up the reaction forward feature
-    from modules.features.mod.reaction_forward.reaction_forward import setup_reaction_forward
-    setup_reaction_forward(bot)
-    
-    # Import and set up the pinger feature
-    from modules.features.mod.pinger.pinger import setup_pinger
-    setup_pinger(bot)
-    
-    # Register mod_help command
-    if 'mod_help' not in registered_commands:
-        try:
-            from modules.features.mod.help_cmd import setup_help_cmd
-            setup_help_cmd(bot)
-            registered_commands.add('mod_help')
-            logger.info("Registered mod_help command")
-        except Exception as e:
-            logger.error(f"Could not register mod_help command: {str(e)}")
-    
-    return registered_commands
+    logger.info("Finished setting up mod features")
 
 def teardown(bot):
     """

@@ -1,56 +1,40 @@
 # Discord Bot Cogs
 
-This directory contains the Discord.py cogs used by the bot. Cogs are extension modules that organize related commands and event handlers into a single class.
+This directory contains the cogs (modular components) for the Discord bot.
 
-## Current Cogs
+## Available Cogs
 
-- **general_cog.py**: Provides general utility commands like ping and purge
-- **config_cog.py**: Contains all configuration commands for different modules
-- **keyword_filter_cog.py**: Monitors messages for problematic content using regex patterns
-- **link_reaction_cog.py**: Adds a link emoji to messages containing embeds from supported stores
-- **reaction_forward_cog.py**: Adds a forward arrow reaction to messages in specified categories
-- **pinger_cog.py**: Monitors mentions (@everyone, @here, and role mentions) and sends notifications
-- **redeye_cog.py**: Manages role-based waitlists with status tracking and notifications
+- **config_cog.py**: Handles configuration commands for all modules
+- **link_reaction_cog.py**: Manages reactions to store links
+- **pinger_cog.py**: Monitors and notifies about mentions
+- **reaction_forward_cog.py**: Forwards messages based on reactions
 
-## Adding a New Cog
+## Development
 
-To add a new cog to the bot:
+When adding a new cog:
+1. Create a new file named `your_feature_cog.py`
+2. Implement the cog class inheriting from `commands.Cog`
+3. Add setup and teardown functions
+4. Register the cog in `discord_bot.py`
 
-1. Create a new file in this directory with the naming pattern `feature_cog.py`
-2. Implement your cog class following this template:
-
+Example:
 ```python
-import discord
 from discord.ext import commands
-import logging
 
-logger = logging.getLogger('discord_bot.cogs.your_cog_name')
-
-class YourCogName(commands.Cog):
+class YourFeatureCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        logger.info("Initializing Your Cog Name")
-    
+        
     async def cog_load(self):
-        logger.info("Loading Your Cog Name")
-        # Setup code here
-    
-    # Add commands using @commands.command() decorator
-    # Add event handlers using @commands.Cog.listener() decorator
+        # Setup code
+        pass
+        
+    async def cog_unload(self):
+        # Cleanup code
+        pass
 
 async def setup(bot):
-    await bot.add_cog(YourCogName(bot))
-    logger.info("Your Cog Name added to bot")
-```
-
-3. Update `discord_bot.py` to load your new cog:
-
-```python
-try:
-    await bot.load_extension("cogs.your_cog_name")
-    logger.info("Loaded your cog name")
-except Exception as e:
-    logger.error(f"Error loading your cog name: {str(e)}")
+    await bot.add_cog(YourFeatureCog(bot))
 ```
 
 ## Benefits of Cog-Based Architecture

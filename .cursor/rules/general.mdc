@@ -48,12 +48,7 @@ Provides essential context about the Discord bot project's architecture, design 
    - Link Reaction: Store-specific link detection
    - Product ID extraction capabilities
 
-3. **Keyword Filter**
-   - Regex-based content monitoring
-   - Configurable actions and severity levels
-   - Channel-specific filtering
-
-4. **Redeye Module**
+3. **Redeye Module**
    - Profile and task management
    - CSV integration
    - Role-based access control
@@ -136,3 +131,135 @@ discord_bot_project/
 
 ## Tags
 #discord-bot #modular-architecture #python #framework 
+
+# General Development Guidelines
+
+## Code Organization
+
+1. **Module Structure**
+   - Clear separation of concerns
+   - Logical grouping of related functionality
+   - Consistent file naming
+
+2. **Feature Implementation**
+   - Self-contained modules
+   - Clear interfaces
+   - Proper error handling
+
+3. **Core Systems**
+   - Command handling
+   - Event processing
+   - Configuration management
+   - Logging system
+
+## Best Practices
+
+1. **Code Quality**
+   - Follow PEP 8 style guide
+   - Write descriptive variable names
+   - Keep functions focused and small
+   - Use type hints consistently
+
+2. **Documentation**
+   - Document all public interfaces
+   - Include usage examples
+   - Keep documentation up-to-date
+   - Use clear and concise language
+
+3. **Testing**
+   - Write comprehensive unit tests
+   - Include integration tests
+   - Test edge cases
+   - Maintain test coverage
+
+4. **Error Handling**
+   - Use appropriate exception types
+   - Provide helpful error messages
+   - Log errors properly
+   - Implement graceful fallbacks
+
+5. **Performance**
+   - Optimize critical paths
+   - Use appropriate data structures
+   - Implement caching where beneficial
+   - Monitor resource usage
+
+## Development Process
+
+1. **Version Control**
+   - Use meaningful commit messages
+   - Keep commits focused
+   - Follow branching strategy
+   - Review code before merging
+
+2. **Code Review**
+   - Check for style compliance
+   - Verify functionality
+   - Look for potential issues
+   - Provide constructive feedback
+
+3. **Deployment**
+   - Use automated deployment
+   - Test in staging environment
+   - Monitor for issues
+   - Have rollback plan
+
+## Security
+
+1. **Data Protection**
+   - Secure sensitive information
+   - Use environment variables
+   - Implement proper authentication
+   - Follow security best practices
+
+2. **Input Validation**
+   - Validate all user input
+   - Sanitize data appropriately
+   - Prevent injection attacks
+   - Handle edge cases
+
+3. **Access Control**
+   - Implement role-based access
+   - Check permissions properly
+   - Log security events
+   - Regular security audits
+
+## Maintenance
+
+1. **Code Cleanup**
+   - Remove dead code
+   - Fix technical debt
+   - Update dependencies
+   - Refactor when needed
+
+2. **Monitoring**
+   - Track performance metrics
+   - Monitor error rates
+   - Check resource usage
+   - Set up alerts
+
+3. **Updates**
+   - Keep dependencies current
+   - Apply security patches
+   - Update documentation
+   - Test thoroughly
+
+## Communication
+
+1. **Team Collaboration**
+   - Regular updates
+   - Clear communication
+   - Knowledge sharing
+   - Pair programming
+
+2. **Documentation**
+   - Keep README updated
+   - Document changes
+   - Write clear comments
+   - Share knowledge
+
+3. **Issue Tracking**
+   - Use issue tracker
+   - Provide clear descriptions
+   - Track progress
+   - Update status 

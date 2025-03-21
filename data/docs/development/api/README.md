@@ -1,289 +1,198 @@
-# API Documentation
+# Development API Guide
+
+## Overview
+
+This guide covers the core APIs and development patterns for extending the Discord bot.
 
 ## Core APIs
 
-### BaseModule
-The foundation class for all feature modules.
+### Module System
+
+The module system provides a flexible architecture for extending bot functionality:
 
 ```python
-class BaseModule:
-    """Base class for bot modules."""
-    
-    def __init__(self, bot):
-        """Initialize module.
-        
-        Args:
-            bot: The Discord bot instance
-        """
-        self.bot = bot
-        self.enabled = False
-        
-    async def setup(self):
-        """Set up the module."""
-        pass
-        
-    async def cleanup(self):
-        """Clean up module resources."""
-        pass
-```
+from core.module import ModuleBase
 
-### BaseConfig
-Base configuration class with validation support.
-
-```python
-class BaseConfig:
-    """Base class for configuration."""
-    
+class CustomModule(ModuleBase):
     def __init__(self):
-        """Initialize configuration."""
-        self._config = {
-            "ENABLED": False
-        }
-        self._version = "1.0.0"
-        
+        super().__init__()
+        self.name = "custom"
+        self.description = "Custom module"
+
+    async def setup(self):
+        # Initialize module
+        pass
+
+    async def cleanup(self):
+        # Cleanup resources
+        pass
+```
+
+### Configuration System
+
+Configuration management for modules:
+
+```python
+from config.core import ConfigBase
+
+class ModuleConfig(ConfigBase):
+    def __init__(self):
+        self.enabled = True
+        self.settings = {}
+
     @property
-    def ENABLED(self) -> bool:
-        """Whether the module is enabled."""
-        return self._config["ENABLED"]
-        
-    @ENABLED.setter
-    def ENABLED(self, value: bool):
-        self._config["ENABLED"] = value
-        
-    def validate_config(self) -> bool:
-        """Validate configuration.
-        
-        Returns:
-            bool: True if valid
-        """
-        return isinstance(self.ENABLED, bool)
+    def is_enabled(self) -> bool:
+        return self.enabled
+
+    def validate(self) -> bool:
+        return True
 ```
 
-## Feature APIs
+### Command System
 
-### Moderation
-
-#### FilterConfig
-Configuration for keyword filtering.
+Creating and registering commands:
 
 ```python
-class FilterConfig(BaseConfig):
-    """Filter configuration."""
+from discord import app_commands
+from core.commands import CommandBase
+
+class CustomCommand(CommandBase):
+    def __init__(self):
+        super().__init__()
+        self.name = "custom"
+        self.description = "Custom command"
+
+    @app_commands.command()
+    async def execute(self, interaction):
+        await interaction.response.send_message("Command executed!")
+```
+
+## Development Guidelines
+
+### Creating New Features
+
+1. Plan the feature
+   - Define requirements
+   - Design interfaces
+   - Plan configuration
+
+2. Implement core functionality
+   - Create module class
+   - Implement commands
+   - Add configuration
+
+3. Add documentation
+   - Update API docs
+   - Add usage examples
+   - Document configuration
+
+4. Write tests
+   - Unit tests
+   - Integration tests
+   - Command tests
+
+### Best Practices
+
+1. Code Organization
+   - Keep modules focused
+   - Use clear naming
+   - Follow project structure
+
+2. Error Handling
+   - Use custom exceptions
+   - Add error messages
+   - Log errors properly
+
+3. Configuration
+   - Validate inputs
+   - Use type hints
+   - Document options
+
+4. Testing
+   - Test edge cases
+   - Mock dependencies
+   - Check performance
+
+## Example Implementation
+
+### Custom Module
+
+```python
+# modules/custom/module.py
+from core.module import ModuleBase
+from core.commands import CommandBase
+from config.core import ConfigBase
+
+class CustomConfig(ConfigBase):
+    def __init__(self):
+        self.enabled = True
+        self.channel_id = None
+
+    def validate(self):
+        return self.channel_id is not None
+
+class CustomCommand(CommandBase):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    async def execute(self, interaction):
+        if not self.config.is_enabled:
+            return
+        await interaction.response.send_message("Success!")
+
+class CustomModule(ModuleBase):
+    def __init__(self):
+        super().__init__()
+        self.config = CustomConfig()
+        self.command = CustomCommand(self.config)
+
+    async def setup(self):
+        await self.register_command(self.command)
+```
+
+## Testing
+
+### Unit Tests
+
+```python
+# tests/test_custom.py
+import pytest
+from modules.custom.module import CustomModule
+
+def test_custom_module():
+    module = CustomModule()
+    assert module.name == "custom"
+    assert module.config.is_enabled
+```
+
+### Integration Tests
+
+```python
+# tests/integration/test_custom.py
+import pytest
+from tests.helpers import TestBot
+
+async def test_custom_command():
+    bot = TestBot()
+    module = CustomModule()
+    await module.setup(bot)
     
-    @property
-    def FILTERS(self) -> dict:
-        """Active filters."""
-        return self._config["FILTERS"]
-        
-    def add_filter(self, name: str, config: dict):
-        """Add a new filter.
-        
-        Args:
-            name: Filter name
-            config: Filter configuration
-        """
-        self._config["FILTERS"][name] = config
+    # Test command
+    result = await bot.simulate_command("custom")
+    assert result.content == "Success!"
 ```
 
-### Reactions
+## Deployment
 
-#### ForwardConfig
-Configuration for message forwarding.
+1. Update version
+2. Run tests
+3. Update docs
+4. Deploy changes
 
-```python
-class ForwardConfig(BaseConfig):
-    """Forward configuration."""
-    
-    @property
-    def DESTINATION_CHANNEL_ID(self) -> Optional[int]:
-        """Channel for forwarded messages."""
-        return self._config["DESTINATION_CHANNEL_ID"]
-        
-    @property
-    def FORWARD_EMOJI(self) -> str:
-        """Emoji for forwarding."""
-        return self._config["FORWARD_EMOJI"]
-```
+## Maintenance
 
-## Utility APIs
-
-### Settings Manager
-Manages persistent settings storage.
-
-```python
-class SettingsManager:
-    """Manages persistent settings."""
-    
-    def load(self) -> dict:
-        """Load settings from storage."""
-        pass
-        
-    def save(self, settings: dict):
-        """Save settings to storage."""
-        pass
-```
-
-### Command Registry
-Handles command registration and permissions.
-
-```python
-class CommandRegistry:
-    """Manages command registration."""
-    
-    def register(self, command: Command):
-        """Register a new command."""
-        pass
-        
-    def unregister(self, command: Command):
-        """Unregister a command."""
-        pass
-```
-
-## Event System
-
-### Event Types
-Standard event types used in the bot.
-
-```python
-class EventType(Enum):
-    """Standard event types."""
-    MESSAGE = "message"
-    REACTION = "reaction"
-    COMMAND = "command"
-    ERROR = "error"
-```
-
-### Event Handler
-Base class for event handlers.
-
-```python
-class EventHandler:
-    """Base event handler."""
-    
-    async def handle(self, event: Event):
-        """Handle an event.
-        
-        Args:
-            event: The event to handle
-        """
-        pass
-```
-
-## Database APIs
-
-### DatabaseManager
-Manages database connections and operations.
-
-```python
-class DatabaseManager:
-    """Manages database operations."""
-    
-    async def connect(self):
-        """Establish database connection."""
-        pass
-        
-    async def disconnect(self):
-        """Close database connection."""
-        pass
-        
-    async def execute(self, query: str, *args):
-        """Execute a database query."""
-        pass
-```
-
-## Logging System
-
-### LogManager
-Manages logging configuration and output.
-
-```python
-class LogManager:
-    """Manages logging system."""
-    
-    def setup(self, config: dict):
-        """Set up logging system.
-        
-        Args:
-            config: Logging configuration
-        """
-        pass
-        
-    def get_logger(self, name: str) -> Logger:
-        """Get a logger instance."""
-        pass
-```
-
-## Error Handling
-
-### ErrorHandler
-Base class for error handlers.
-
-```python
-class ErrorHandler:
-    """Base error handler."""
-    
-    async def handle(self, error: Exception):
-        """Handle an error.
-        
-        Args:
-            error: The error to handle
-        """
-        pass
-```
-
-## Utility Functions
-
-### Permission Checks
-```python
-def has_permission(user: User, permission: str) -> bool:
-    """Check if user has permission."""
-    pass
-    
-def require_permission(permission: str):
-    """Decorator for permission requirements."""
-    pass
-```
-
-### Validation
-```python
-def validate_channel_id(channel_id: int) -> bool:
-    """Validate a channel ID."""
-    pass
-    
-def validate_role_id(role_id: int) -> bool:
-    """Validate a role ID."""
-    pass
-```
-
-## Constants
-
-### Permission Levels
-```python
-PERMISSION_LEVELS = {
-    "EVERYONE": 0,
-    "MODERATOR": 1,
-    "ADMIN": 2
-}
-```
-
-### Event Names
-```python
-EVENT_NAMES = {
-    "MESSAGE_CREATE": "on_message",
-    "REACTION_ADD": "on_reaction_add",
-    "COMMAND_ERROR": "on_command_error"
-}
-```
-
-## Type Definitions
-
-### Custom Types
-```python
-from typing import TypeVar, Union
-
-ChannelID = NewType("ChannelID", int)
-RoleID = NewType("RoleID", int)
-UserID = NewType("UserID", int)
-
-ConfigValue = Union[str, int, bool, list, dict]
-``` 
+1. Monitor logs
+2. Check performance
+3. Update dependencies
+4. Review feedback 

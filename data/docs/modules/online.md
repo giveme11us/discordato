@@ -93,6 +93,12 @@ ONLINE_TRACK_STATUS=True
 ONLINE_NOTIFICATION_CHANNEL=channel_id
 ONLINE_UPDATE_INTERVAL=60
 ONLINE_STORE_DAYS=30
+# Performance Settings
+SYNC_COOLDOWN=60      # Cooldown between syncs in seconds
+RETRY_BUFFER=5        # Buffer time between retries
+MAX_RETRIES=3         # Maximum retry attempts
+BATCH_SIZE=25         # Commands per batch
+CACHE_TTL=3600       # Cache time-to-live in seconds
 ```
 
 ### Module Settings

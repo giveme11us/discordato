@@ -161,192 +161,160 @@ class DatabaseError(BotError):
     """
     pass
 
-async def handle_interaction_error(interaction: discord.Interaction, error: Exception) -> None:
+class ErrorHandler:
     """
-    Handle errors that occur during command interactions.
+    Centralized error handling for the Discord bot.
     
-    This function:
-    1. Logs the error appropriately
-    2. Sends user-friendly error messages
-    3. Tracks error patterns
-    4. Handles different error types
-    5. Manages error recovery
-    6. Preserves interaction context
+    This class:
+    1. Processes and logs errors
+    2. Provides user-friendly error messages
+    3. Handles different error types appropriately
+    4. Maintains error tracking and statistics
     
-    Args:
-        interaction (discord.Interaction): The Discord interaction
-        error (Exception): The error that occurred
-        
-    Note:
-        Error handling hierarchy:
-        1. BotError: Shows custom user message
-        2. CommandNotFound: Shows help message
-        3. MissingPermissions: Shows permission error
-        4. Other: Shows generic error message
-        
-    Critical:
-        - Must handle all error types
-        - Should preserve interaction state
-        - Must provide user feedback
-        - Should support recovery
-    """
-    try:
-        if isinstance(error, app_commands.CommandInvokeError):
-            error = error.original
-            
-        if isinstance(error, BotError):
-            # Handle bot-specific errors with custom messages
-            await interaction.response.send_message(
-                error.user_message,
-                ephemeral=True
-            )
-            logger.error(
-                f"Bot error in {interaction.command}",
-                extra={'error': error.message, 'details': error.details}
-            )
-            
-        elif isinstance(error, app_commands.CommandNotFound):
-            # Guide users to available commands
-            await interaction.response.send_message(
-                "Command not found. Use /help to see available commands.",
-                ephemeral=True
-            )
-            logger.warning(
-                f"Unknown command attempted",
-                extra={'command': interaction.command, 'user': str(interaction.user)}
-            )
-            
-        elif isinstance(error, app_commands.MissingPermissions):
-            # Handle permission errors with clear feedback
-            await interaction.response.send_message(
-                "You don't have permission to use this command.",
-                ephemeral=True
-            )
-            logger.warning(
-                f"Permission denied",
-                extra={
-                    'user': str(interaction.user),
-                    'command': interaction.command,
-                    'missing_permissions': error.missing_permissions
-                }
-            )
-            
-        else:
-            # Handle unexpected errors safely
-            await interaction.response.send_message(
-                "An unexpected error occurred. Please try again later.",
-                ephemeral=True
-            )
-            logger.error(
-                f"Unexpected error",
-                extra={
-                    'command': interaction.command,
-                    'user': str(interaction.user),
-                    'error': str(error)
-                },
-                exc_info=error
-            )
-            
-    except Exception as e:
-        # Handle errors in error handling
-        logger.critical(
-            f"Error handler failure",
-            extra={
-                'handler_error': str(e),
-                'original_error': str(error),
-                'command': interaction.command
-            },
-            exc_info=True
-        )
-        try:
-            await interaction.response.send_message(
-                "An error occurred while processing your command.",
-                ephemeral=True
-            )
-        except:
-            pass
-
-def log_error(error: Exception, context: Optional[Dict[str, Any]] = None) -> None:
-    """
-    Log an error with additional context.
-    
-    This function:
-    1. Formats error information
-    2. Adds context details
-    3. Includes stack traces
-    4. Maintains log structure
-    
-    Args:
-        error (Exception): The error to log
-        context (dict, optional): Additional context information
-        
-    Critical:
-        - Must preserve error context
-        - Should include stack traces
-        - Must maintain log format
-        - Should support error tracking
-    """
-    error_details = {
-        'error_type': type(error).__name__,
-        'error_message': str(error),
-        'stack_trace': traceback.format_exc(),
-        **(context or {})
-    }
-    
-    logger.error(
-        "Error occurred",
-        extra={
-            'error': str(error),
-            'details': error_details
-        }
-    )
-
-def setup_error_handling(bot: discord.Client) -> None:
-    """
-    Set up global error handling for the bot.
-    
-    This function:
-    1. Registers error handlers
-    2. Sets up logging
-    3. Configures recovery
-    4. Initializes tracking
-    5. Sets up monitoring
-    
-    Args:
+    Attributes:
         bot (discord.Client): The Discord bot instance
-        
-    Critical:
-        - Must handle all error types
-        - Should support recovery
-        - Must maintain logging
-        - Should enable monitoring
+        error_count (int): Number of errors handled
+        last_error (Exception): Last error that occurred
     """
-
-    @bot.event
-    async def on_error(event: str, *args, **kwargs):
+    
+    def __init__(self, bot: discord.Client):
         """
-        Handle non-command errors.
-        
-        This handler:
-        1. Captures event errors
-        2. Logs error details
-        3. Maintains context
-        4. Supports recovery
+        Initialize the error handler.
         
         Args:
-            event (str): The event that errored
-            *args: Event arguments
-            **kwargs: Event keyword arguments
+            bot: The Discord bot instance
         """
-        error = traceback.format_exc()
+        self.bot = bot
+        self.error_count = 0
+        self.last_error = None
+        self.setup_error_handling(bot)
+        
+    async def handle_interaction_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        """
+        Handle errors that occur during command interactions.
+        
+        Args:
+            interaction: The Discord interaction
+            error: The error that occurred
+        """
+        try:
+            self.error_count += 1
+            self.last_error = error
+            
+            if isinstance(error, app_commands.CommandInvokeError):
+                error = error.original
+                
+            if isinstance(error, BotError):
+                await interaction.response.send_message(
+                    error.user_message,
+                    ephemeral=True
+                )
+                logger.error(
+                    f"Bot error in {interaction.command}",
+                    extra={'error': error.message, 'details': error.details}
+                )
+                
+            elif isinstance(error, app_commands.CommandNotFound):
+                await interaction.response.send_message(
+                    "Command not found. Use /help to see available commands.",
+                    ephemeral=True
+                )
+                logger.warning(
+                    f"Unknown command attempted",
+                    extra={'command': interaction.command, 'user': str(interaction.user)}
+                )
+                
+            elif isinstance(error, app_commands.MissingPermissions):
+                await interaction.response.send_message(
+                    "You don't have permission to use this command.",
+                    ephemeral=True
+                )
+                logger.warning(
+                    f"Permission denied",
+                    extra={
+                        'user': str(interaction.user),
+                        'command': interaction.command,
+                        'missing_permissions': error.missing_permissions
+                    }
+                )
+                
+            else:
+                await interaction.response.send_message(
+                    "An unexpected error occurred. Please try again later.",
+                    ephemeral=True
+                )
+                logger.error(
+                    f"Unexpected error",
+                    extra={
+                        'command': interaction.command,
+                        'user': str(interaction.user),
+                        'error': str(error)
+                    },
+                    exc_info=error
+                )
+                
+        except Exception as e:
+            logger.critical(
+                f"Error handler failure",
+                extra={
+                    'handler_error': str(e),
+                    'original_error': str(error),
+                    'command': interaction.command
+                },
+                exc_info=True
+            )
+            try:
+                await interaction.response.send_message(
+                    "An error occurred while processing your command.",
+                    ephemeral=True
+                )
+            except:
+                pass
+                
+    def log_error(self, error: Exception, context: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Log an error with additional context.
+        
+        Args:
+            error: The error to log
+            context: Additional context information
+        """
+        self.error_count += 1
+        self.last_error = error
+        
+        error_details = {
+            'error_type': type(error).__name__,
+            'error_message': str(error),
+            'stack_trace': traceback.format_exc(),
+            **(context or {})
+        }
+        
         logger.error(
-            f"Event error",
+            "Error occurred",
             extra={
-                'event': event,
-                'error': error,
-                'args': args,
-                'kwargs': kwargs
+                'error': str(error),
+                'details': error_details
             }
         )
         
-    logger.info("Error handling system initialized") 
+    def setup_error_handling(self, bot: discord.Client) -> None:
+        """
+        Set up global error handling for the bot.
+        
+        Args:
+            bot: The Discord bot instance
+        """
+        @bot.event
+        async def on_error(event: str, *args, **kwargs):
+            error = traceback.format_exc()
+            logger.error(
+                f"Event error",
+                extra={
+                    'event': event,
+                    'error': error,
+                    'args': args,
+                    'kwargs': kwargs
+                }
+            )
+            
+        logger.info("Error handling system initialized") 

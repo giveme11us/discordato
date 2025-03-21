@@ -344,6 +344,69 @@ async def setup(bot):
         # Skip if monitoring specific channels and this isn't one of them
         if PINGER_CONFIG["monitor_channel_ids"] and message.channel.id not in PINGER_CONFIG["monitor_channel_ids"]:
             return
+
+        # Check for @everyone and @here mentions
+        monitor_everyone = os.getenv('PINGER_MONITOR_EVERYONE', 'True').lower() == 'true'
+        monitor_here = os.getenv('PINGER_MONITOR_HERE', 'True').lower() == 'true'
+        monitor_roles = os.getenv('PINGER_MONITOR_ROLES', 'True').lower() == 'true'
+        
+        # Get whitelist roles
+        whitelist_role_ids = [int(id) for id in os.getenv('PINGER_WHITELIST_ROLE_IDS', '').split(',') if id]
+        
+        # Check if user has permission to mention everyone/here
+        has_permission = False
+        if whitelist_role_ids:
+            member_roles = [role.id for role in message.author.roles]
+            has_permission = any(role_id in whitelist_role_ids for role_id in member_roles)
+        
+        if has_permission:
+            notification_channel_id = int(os.getenv('PINGER_NOTIFICATION_CHANNEL_ID', 0))
+            if notification_channel_id:
+                channel = bot.get_channel(notification_channel_id)
+                if channel:
+                    mentions = []
+                    
+                    # Check for @everyone
+                    if monitor_everyone and message.mention_everyone:
+                        mentions.append('@everyone')
+                        
+                    # Check for @here
+                    if monitor_here and '@here' in message.content:
+                        mentions.append('@here')
+                        
+                    # Check for role mentions
+                    if monitor_roles and message.role_mentions:
+                        mentions.extend([role.name for role in message.role_mentions])
+                    
+                    if mentions:
+                        # Create notification embed
+                        embed = discord.Embed(
+                            description=message.content,
+                            timestamp=message.created_at,
+                            color=int(os.getenv('EMBED_COLOR', '000000'), 16)
+                        )
+                        
+                        embed.set_author(
+                            name=message.author.display_name,
+                            icon_url=message.author.display_avatar.url
+                        )
+                        
+                        embed.add_field(
+                            name="Important Mention",
+                            value=", ".join(f"`{m}`" for m in mentions)
+                        )
+                        
+                        # Create button for jumping to message
+                        view = discord.ui.View()
+                        view.add_item(
+                            discord.ui.Button(
+                                style=discord.ButtonStyle.link,
+                                label="Jump to Message",
+                                url=message.jump_url
+                            )
+                        )
+                        
+                        await channel.send(embed=embed, view=view)
             
         # Check message against user keywords
         for user_id, config in PINGER_CONFIG["user_keywords"].items():
@@ -377,19 +440,24 @@ async def setup(bot):
                             value=f"`{keyword}`"
                         )
                         
-                        embed.add_field(
-                            name="Source",
-                            value=f"[Jump to message]({message.jump_url})"
+                        # Create button for jumping to message
+                        view = discord.ui.View()
+                        view.add_item(
+                            discord.ui.Button(
+                                style=discord.ButtonStyle.link,
+                                label="Jump to Message",
+                                url=message.jump_url
+                            )
                         )
                         
                         # Send notification
                         if PINGER_CONFIG["notification_channel_id"]:
                             channel = bot.get_channel(PINGER_CONFIG["notification_channel_id"])
                             if channel:
-                                await channel.send(content=user.mention, embed=embed)
+                                await channel.send(content=user.mention, embed=embed, view=view)
                         else:
                             try:
-                                await user.send(embed=embed)
+                                await user.send(embed=embed, view=view)
                             except:
                                 logger.warning(f"Could not DM user {user_id}")
                                 

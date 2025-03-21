@@ -8,23 +8,30 @@ The Command Registry is responsible for:
 2. Preventing duplicate command registration
 3. Managing command metadata and permissions
 4. Synchronizing commands with Discord
+5. Caching command states
+6. Batching command updates
+7. Rate limiting command operations
 
 Critical:
 - Commands must have unique names
 - Commands must be registered before syncing
 - Command metadata must be complete
 - Permissions must be properly configured
-
-Classes:
-    CommandRegistry: Central registry for managing bot commands
-    BaseCommand: Base class for all commands
+- Must handle rate limits
+- Should use caching
+- Must batch updates
 """
 
 import logging
 import discord
 from discord import app_commands
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, List, Any
+from datetime import datetime, timedelta
 from .commands.base import BaseCommand
+from .commands.permission_commands import permission_commands
+from .command_sync import command_sync
+from .error_handler import CommandError
+import asyncio
 
 logger = logging.getLogger('discord_bot.command_registry')
 
@@ -37,10 +44,17 @@ class CommandRegistry:
     - Command metadata management
     - Discord command synchronization
     - Permission configuration
+    - Command state caching
+    - Batched updates
+    - Rate limiting
     
     Attributes:
         _commands (Dict[str, BaseCommand]): Maps command names to instances
         _registered_commands (Set[str]): Set of synced command names
+        command_groups (Dict[str, List[BaseCommand]]): Dictionary of command group names to commands
+        _command_cache (Dict[str, Any]): Cache for command metadata
+        _last_sync (datetime): Timestamp of last sync operation
+        _pending_syncs (Set[str]): Set of commands pending sync
         
     Critical:
         - Command names must be unique
@@ -60,30 +74,55 @@ class CommandRegistry:
         """
         self._commands: Dict[str, BaseCommand] = {}
         self._registered_commands: Set[str] = set()
+        self.command_groups: Dict[str, List[BaseCommand]] = {}
+        self._command_cache: Dict[str, Any] = {}
+        self._last_sync = datetime.min
+        self._pending_syncs: Set[str] = set()
         
-    def register_command(self, command: BaseCommand) -> None:
+    def register_command(self, command: BaseCommand, group: str = None) -> None:
         """
-        Register a new command in the registry.
-        
-        This method:
-        1. Validates command uniqueness
-        2. Stores command instance
-        3. Tracks registration state
+        Register a command with the registry.
         
         Args:
-            command (BaseCommand): Command instance to register
+            command: The command to register
+            group: Optional group name for the command
             
         Raises:
             ValueError: If command name is already registered
-            
-        Note:
-            Commands must be registered before syncing with Discord
         """
         if command.name in self._commands:
-            raise ValueError(f"Command '{command.name}' is already registered")
+            raise ValueError(f"Command {command.name} is already registered")
             
         self._commands[command.name] = command
-        logger.info(f"Registered command: {command.name}")
+        self._registered_commands.add(command.name)
+        self._pending_syncs.add(command.name)
+        
+        # Cache command metadata
+        self._command_cache[command.name] = {
+            'name': command.name,
+            'description': command.description,
+            'permissions': command.permissions,
+            'group': group,
+            'registered_at': datetime.now()
+        }
+        
+        if group:
+            if group not in self.command_groups:
+                self.command_groups[group] = []
+            self.command_groups[group].append(command)
+            
+        logger.info(f"Registered command: {command.name} in group: {group}")
+        
+    def register_commands(self, commands: List[BaseCommand], group: str = None) -> None:
+        """
+        Register multiple commands at once.
+        
+        Args:
+            commands: List of commands to register
+            group: Optional group name for the commands
+        """
+        for command in commands:
+            self.register_command(command, group)
         
     def get_command(self, name: str) -> Optional[BaseCommand]:
         """
@@ -96,11 +135,29 @@ class CommandRegistry:
             Optional[BaseCommand]: Command instance if found, None otherwise
             
         Note:
-            Returns None if command is not registered
+            Checks cache first before accessing storage
         """
-        return self._commands.get(name)
+        # Check cache first
+        if name in self._command_cache:
+            cached = self._command_cache[name]
+            if 'instance' in cached:
+                return cached['instance']
+                
+        command = self._commands.get(name)
+        if command:
+            # Update cache
+            if name in self._command_cache:
+                self._command_cache[name]['instance'] = command
+            else:
+                self._command_cache[name] = {
+                    'name': command.name,
+                    'description': command.description,
+                    'permissions': command.permissions,
+                    'instance': command
+                }
+        return command
         
-    def register_with_bot(self, bot: discord.Client) -> None:
+    async def register_with_bot(self, bot: discord.Client) -> None:
         """
         Register all commands with the Discord bot.
         
@@ -108,22 +165,50 @@ class CommandRegistry:
         1. Converts commands to Discord format
         2. Registers with Discord's command system
         3. Updates sync state tracking
+        4. Handles rate limits
+        5. Batches updates
         
         Args:
             bot (discord.Client): The Discord bot instance
             
         Note:
-            Failures are logged but don't stop registration
+            Uses command_sync for optimized registration
         """
-        for command in self._commands.values():
-            try:
-                app_command = command.to_app_command()
-                bot.tree.add_command(app_command)
-                self._registered_commands.add(command.name)
-                logger.info(f"Registered command with Discord: {command.name}")
-            except Exception as e:
-                logger.error(f"Failed to register command {command.name}: {e}")
+        try:
+            # Register commands in batches
+            batch_size = 25
+            commands = list(self._commands.values())
+            
+            for i in range(0, len(commands), batch_size):
+                batch = commands[i:i + batch_size]
+                for command in batch:
+                    if command.name in self._pending_syncs:
+                        app_command = command.to_app_command()
+                        success = await command_sync.register_command(
+                            bot=bot,
+                            command_name=command.name,
+                            command_callback=app_command.callback,
+                            description=command.description,
+                            **command.options
+                        )
+                        if success:
+                            self._pending_syncs.remove(command.name)
+                            
+                # Small delay between batches to avoid rate limits
+                if i + batch_size < len(commands):
+                    await asyncio.sleep(1)
+                    
+            # Sync commands if needed
+            if self._pending_syncs:
+                await command_sync.sync_commands(bot)
+                self._pending_syncs.clear()
                 
+            logger.info("Successfully registered all commands with Discord")
+            
+        except Exception as e:
+            logger.error(f"Failed to register commands: {e}", exc_info=True)
+            raise CommandError(f"Failed to register commands: {str(e)}")
+            
     @property
     def registered_commands(self) -> Set[str]:
         """
@@ -155,8 +240,49 @@ class CommandRegistry:
         """
         return iter(self._commands.values())
 
-# Global registry instance
-registry = CommandRegistry()
+    def clear_cache(self) -> None:
+        """Clear the command cache."""
+        self._command_cache.clear()
+        logger.info("Command cache cleared")
+        
+    async def setup_commands(self, tree: app_commands.CommandTree) -> None:
+        """
+        Set up all registered commands with the Discord command tree.
+        
+        Args:
+            tree: The Discord command tree
+            
+        Note:
+            Uses batching and rate limiting for optimal performance
+        """
+        try:
+            # Register ungrouped commands first
+            ungrouped = self.command_groups.get(None, [])
+            for i in range(0, len(ungrouped), 25):
+                batch = ungrouped[i:i + 25]
+                for command in batch:
+                    command.register(tree)
+                if i + 25 < len(ungrouped):
+                    await asyncio.sleep(1)
+                    
+            # Then register grouped commands
+            for group_name, commands in self.command_groups.items():
+                if group_name:
+                    for i in range(0, len(commands), 25):
+                        batch = commands[i:i + 25]
+                        for command in batch:
+                            command.register(tree)
+                        if i + 25 < len(commands):
+                            await asyncio.sleep(1)
+                            
+            logger.info("All commands have been set up")
+            
+        except Exception as e:
+            logger.error(f"Failed to set up commands: {e}", exc_info=True)
+            raise CommandError(f"Failed to set up commands: {str(e)}")
+
+# Global command registry instance
+command_registry = CommandRegistry()
 
 def register_all_commands(bot: discord.Client) -> None:
     """
@@ -334,338 +460,6 @@ def register_all_commands(bot: discord.Client) -> None:
         logger.error(f"Error registering utility commands: {e}")
     
     try:
-        # Register keyword-filter-config command
-        @bot.tree.command(
-            name="keyword-filter-config",
-            description="Configure the keyword filter feature"
-        )
-        @app_commands.describe(
-            action="The action to perform (view, enable, disable, categories, blacklist, filters, dry_run)",
-            filter_id="The filter ID to configure (for filters action)",
-            setting="The setting to modify for the selected filter or feature",
-            value="The new value for the setting"
-        )
-        @app_commands.choices(
-            action=[
-                app_commands.Choice(name="View Configuration", value="view"),
-                app_commands.Choice(name="Enable Feature", value="enable"),
-                app_commands.Choice(name="Disable Feature", value="disable"),
-                app_commands.Choice(name="Manage Categories", value="categories"),
-                app_commands.Choice(name="Manage Blacklist", value="blacklist"),
-                app_commands.Choice(name="Configure Notifications", value="notification"),
-                app_commands.Choice(name="Toggle Dry Run Mode", value="dry_run"),
-                app_commands.Choice(name="Manage Filters", value="filters")
-            ]
-        )
-        async def keyword_filter_config(
-            interaction: discord.Interaction, 
-            action: str = "view",
-            filter_id: str = None,
-            setting: str = None,
-            value: str = None
-        ):
-            """
-            Configure keyword filter feature settings.
-            
-            This command:
-            1. Validates user permissions
-            2. Processes configuration changes
-            3. Updates filter settings
-            
-            Args:
-                interaction (discord.Interaction): Command interaction
-                action (str, optional): Action to perform (default: view)
-                filter_id (str, optional): Filter ID to configure
-                setting (str, optional): Setting to modify
-                value (str, optional): New setting value
-                
-            Note:
-                Requires administrator permissions
-            """
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "You need administrator permissions to use this command.",
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                from modules.mod.keyword_filter.config_cmd import keyword_filter_config
-                await keyword_filter_config.callback(interaction, action, filter_id, setting, value)
-            except Exception as e:
-                logger.error(f"Error executing keyword-filter-config command: {str(e)}")
-                await interaction.response.send_message(
-                    "An error occurred while executing the command.",
-                    ephemeral=True
-                )
-            
-            logger.debug(f"Keyword-filter-config command executed by {interaction.user}")
-        
-        registered_commands.append("keyword-filter-config")
-        registered_count += 1
-    except Exception as e:
-        logger.error(f"Error registering keyword-filter-config command: {e}")
-    
-    try:
-        # Register keyword-filter-quicksetup command
-        @bot.tree.command(
-            name="keyword-filter-quicksetup",
-            description="Quick setup for keyword filter with a single command"
-        )
-        @app_commands.describe(
-            source_channel="The channel or category ID to monitor for keywords",
-            notification_channel="The channel ID where notifications will be sent",
-            keywords="Comma-separated list of keywords to filter (e.g., 'test,hello,example')"
-        )
-        async def keyword_filter_quicksetup(
-            interaction: discord.Interaction,
-            source_channel: str,
-            notification_channel: str,
-            keywords: str
-        ):
-            """
-            Quick setup for keyword filter with a single command.
-            
-            This command:
-            1. Validates user permissions
-            2. Processes setup request
-            3. Updates settings
-            
-            Args:
-                interaction (discord.Interaction): Command interaction
-                source_channel (str): Channel or category ID to monitor for keywords
-                notification_channel (str): Channel ID where notifications will be sent
-                keywords (str): Comma-separated list of keywords to filter
-                
-            Note:
-                Requires administrator permissions
-            """
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "You need administrator permissions to use this command.",
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                from modules.mod.keyword_filter.config_cmd import keyword_filter_quicksetup
-                # Access the command's callback function instead of calling the command object directly
-                await keyword_filter_quicksetup.callback(interaction, source_channel, notification_channel, keywords)
-            except Exception as e:
-                logger.error(f"Error executing keyword-filter-quicksetup command: {str(e)}")
-                await interaction.response.send_message(
-                    "An error occurred while executing the command.",
-                    ephemeral=True
-                )
-            
-            logger.debug(f"Keyword-filter-quicksetup command executed by {interaction.user}")
-        
-        registered_commands.append("keyword-filter-quicksetup")
-    except Exception as e:
-        logger.error(f"Error registering keyword-filter-quicksetup command: {e}")
-    
-    try:
-        # Register reaction-forward-config command
-        @bot.tree.command(
-            name="reaction-forward-config",
-            description="Configure the reaction forward feature"
-        )
-        @app_commands.describe(
-            setting="The setting to view or modify (categories, enable, disable, forwarding, blacklist)",
-            value="The new value for the setting"
-        )
-        @app_commands.choices(
-            setting=[
-                app_commands.Choice(name="View Configuration", value="view"),
-                app_commands.Choice(name="Enable Feature", value="enable"),
-                app_commands.Choice(name="Disable Feature", value="disable"),
-                app_commands.Choice(name="Toggle Forwarding", value="forwarding"),
-                app_commands.Choice(name="Manage Categories", value="categories"),
-                app_commands.Choice(name="Manage Blacklist", value="blacklist")
-            ]
-        )
-        async def reaction_forward_config(interaction: discord.Interaction, setting: str = "view", value: str = None):
-            """
-            Configure reaction forwarding settings.
-            
-            This command:
-            1. Validates user permissions
-            2. Processes configuration changes
-            3. Updates forwarding settings
-            
-            Args:
-                interaction (discord.Interaction): Command interaction
-                setting (str, optional): Setting to modify (default: view)
-                value (str, optional): New setting value
-                
-            Note:
-                Requires administrator permissions
-            """
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "You need administrator permissions to use this command.",
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                from modules.mod.reaction_forward.config_cmd import reaction_forward_config
-                await reaction_forward_config.callback(interaction, setting, value)
-            except Exception as e:
-                logger.error(f"Error executing reaction-forward-config command: {str(e)}")
-                await interaction.response.send_message(
-                    "An error occurred while executing the command.",
-                    ephemeral=True
-                )
-            
-            logger.debug(f"Reaction-forward-config command executed by {interaction.user}")
-        
-        registered_commands.append("reaction-forward-config")
-        registered_count += 1
-    except Exception as e:
-        logger.error(f"Error registering reaction-forward-config command: {e}")
-    
-    try:
-        # Register link-reaction-config command
-        @bot.tree.command(
-            name="link-reaction-config",
-            description="Configure the link reaction feature and manage store settings"
-        )
-        @app_commands.describe(
-            action="The action to perform (view, enable, disable, categories, blacklist, stores)",
-            store_id="The store ID to configure (for stores action)",
-            setting="The setting to modify for the selected store or feature",
-            value="The new value for the setting"
-        )
-        @app_commands.choices(
-            action=[
-                app_commands.Choice(name="View Configuration", value="view"),
-                app_commands.Choice(name="Enable Feature", value="enable"),
-                app_commands.Choice(name="Disable Feature", value="disable"),
-                app_commands.Choice(name="Manage Categories", value="categories"),
-                app_commands.Choice(name="Manage Blacklist", value="blacklist"),
-                app_commands.Choice(name="Manage Stores", value="stores")
-            ]
-        )
-        async def link_reaction_config(
-            interaction: discord.Interaction, 
-            action: str = "view",
-            store_id: str = None,
-            setting: str = None,
-            value: str = None
-        ):
-            """
-            Configure link reaction and store settings.
-            
-            This command:
-            1. Validates user permissions
-            2. Processes configuration changes
-            3. Updates store settings
-            
-            Args:
-                interaction (discord.Interaction): Command interaction
-                action (str, optional): Action to perform (default: view)
-                store_id (str, optional): Store ID to configure
-                setting (str, optional): Setting to modify
-                value (str, optional): New setting value
-                
-            Note:
-                Requires administrator permissions
-            """
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "You need administrator permissions to use this command.",
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                from modules.mod.link_reaction.config_cmd import link_reaction_config
-                await link_reaction_config.callback(interaction, action, store_id, setting, value)
-            except Exception as e:
-                logger.error(f"Error executing link-reaction-config command: {str(e)}")
-                await interaction.response.send_message(
-                    "An error occurred while executing the command.",
-                    ephemeral=True
-                )
-            
-            logger.debug(f"Link-reaction-config command executed by {interaction.user}")
-        
-        registered_commands.append("link-reaction-config")
-        registered_count += 1
-    except Exception as e:
-        logger.error(f"Error registering link-reaction-config command: {e}")
-    
-    try:
-        # Register mod-config command
-        @bot.tree.command(
-            name="mod-config",
-            description="Configure module-wide settings"
-        )
-        @app_commands.describe(
-            setting="The setting to configure (whitelist)",
-            action="The action to perform (add, remove, clear, view)",
-            value="The value for the action (role ID or mention)"
-        )
-        @app_commands.choices(
-            setting=[
-                app_commands.Choice(name="Whitelist Roles", value="whitelist")
-            ],
-            action=[
-                app_commands.Choice(name="View Current Settings", value="view"),
-                app_commands.Choice(name="Add Role", value="add"),
-                app_commands.Choice(name="Remove Role", value="remove"),
-                app_commands.Choice(name="Clear All Roles", value="clear")
-            ]
-        )
-        async def mod_config(
-            interaction: discord.Interaction, 
-            setting: str = "whitelist", 
-            action: str = "view", 
-            value: str = None
-        ):
-            """
-            Configure module-wide settings.
-            
-            This command:
-            1. Validates user permissions
-            2. Processes configuration changes
-            3. Updates module settings
-            
-            Args:
-                interaction (discord.Interaction): Command interaction
-                setting (str, optional): Setting to configure (default: whitelist)
-                action (str, optional): Action to perform (default: view)
-                value (str, optional): Value for the action
-                
-            Note:
-                Requires administrator permissions
-            """
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "You need administrator permissions to use this command.",
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                from modules.mod.config_cmd import mod_config
-                await mod_config.callback(interaction, setting, action, value)
-            except Exception as e:
-                logger.error(f"Error executing mod-config command: {str(e)}")
-                await interaction.response.send_message(
-                    "An error occurred while executing the command.",
-                    ephemeral=True
-                )
-            
-            logger.debug(f"Mod-config command executed by {interaction.user}")
-        
-        registered_commands.append("mod-config")
-        registered_count += 1
-    except Exception as e:
-        logger.error(f"Error registering mod-config command: {e}")
-    
-    try:
         # Register purge command
         @bot.tree.command(
             name="purge",
@@ -731,4 +525,4 @@ def register_all_commands(bot: discord.Client) -> None:
     for cmd in registered_commands:
         logger.info(f"  - Registered command: {cmd}")
     
-    return registered_count 
+    return registered_count

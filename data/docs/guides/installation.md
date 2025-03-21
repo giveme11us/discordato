@@ -28,17 +28,17 @@ Before installing the bot, ensure you have the following prerequisites:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/discordbot.git
+git clone https://github.com/yourusername/discord-bot.git
 
 # Navigate to project directory
-cd discordbot
+cd discord-bot
 ```
 
 ### 2. Create Virtual Environment
 
 ```bash
 # Create virtual environment
-python -m venv venv
+python -m venv .venv
 
 # Activate virtual environment
 # Windows
@@ -59,26 +59,34 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-# Bot Configuration
+# Discord Bot Configuration
 DISCORD_BOT_TOKEN=your_bot_token_here
-COMMAND_PREFIX=/
-GUILD_IDS=guild_id1,guild_id2
-DEV_GUILD_ID=your_dev_guild_id
+APPLICATION_ID=your_app_id_here
 
-# Module Settings
-ENABLED_MODULES=mod,redeye
-COMMAND_COOLDOWN=3
-MAX_COMMANDS_PER_MINUTE=60
+# Enabled Modules
+ENABLED_MODULES=mod,online,instore,redeye
 
-# Development Settings
-DEBUG_LOGGING=True
+# Moderation Settings
+MOD_WHITELIST_ROLE_IDS=role_id1,role_id2
+MOD_LOG_CHANNEL_ID=channel_id
+
+# Pinger Settings
+PINGER_NOTIFICATION_CHANNEL_ID=channel_id
+PINGER_MONITOR_EVERYONE=True
+PINGER_MONITOR_HERE=True
+PINGER_MONITOR_ROLES=True
+
+# Link Reaction Settings
+LINK_REACTION_ENABLED=True
+LINK_REACTION_NOTIFICATION_CHANNEL_ID=channel_id
+LINK_REACTION_LOG_CHANNEL_ID=channel_id
 ```
 
 ### 5. Initialize the Bot
 
 ```bash
 # Start the bot
-python bot.py
+python discord_bot.py
 ```
 
 ## Module Configuration
@@ -96,10 +104,6 @@ Core modules are installed by default:
    ```env
    # Enable mod module
    ENABLED_MODULES=mod
-
-   # Keyword filter configuration
-   FILTER_DEFAULT_CONFIG_ENABLED=False
-   FILTER_DEFAULT_CONFIG_DRY_RUN=True
    ```
 
 2. **Redeye Module**
@@ -155,8 +159,9 @@ Core modules are installed by default:
 
 1. Configure mod module:
    ```
-   /mod-config - Configure module settings
-   /keyword-filter-config - Set up keyword filtering
+   /mod-config - Configure moderation settings
+   /pinger-config - Configure mention monitoring
+   /link-reaction-config - Configure link reactions
    ```
 
 2. Configure redeye module:
@@ -207,4 +212,20 @@ Core modules are installed by default:
 - Monitor Discord updates
 - Regular security checks
 - Maintain backups
-- Test regularly 
+- Test regularly
+
+## Updates
+
+To update the bot:
+
+1. Pull the latest changes:
+```bash
+git pull origin main
+```
+
+2. Update dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Check for new environment variables in `.env.example` 

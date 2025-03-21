@@ -1,201 +1,94 @@
-# Modules API Documentation
+# Modules Documentation
 
-## Overview
-
-The module system provides a flexible architecture for extending bot functionality through independent modules. Each module must implement a standard interface for setup and teardown.
-
-### Module Types
-
-1. **Core Modules**
-   - Essential bot functionality
-   - System-level operations
-   - Framework services
-
-2. **Feature Modules**
-   - User-facing functionality
-   - Command implementations
-   - Specific bot features
+This document describes the available modules and their functionality.
 
 ## Core Modules
 
-### Command Router (`core/command_router.py`)
+### Moderation (`mod`)
+The moderation module provides tools for server management:
+- Role-based access control
+- Command restrictions
+- Logging of moderation actions
+- Auto-moderation features
 
-Manages command registration and routing.
+### Link Reaction (`link_reaction`)
+Handles link detection and reactions:
+- Detects posted links
+- Adds configurable reactions
+- Forwards links to notification channels
+- Logs link activity
 
-```python
-from core.command_router import CommandRouter
+### Pinger (`pinger`)
+Monitors and notifies about mentions:
+- Tracks @everyone, @here, and role mentions
+- Configurable notification channels
+- Mention statistics and logging
+- Role-based monitoring settings
 
-router = CommandRouter(bot)
-router.register_command(command)
-router.register_group("group_name", "description")
-```
-
-#### Key Methods
-- `register_command(command)`: Register a new command
-- `register_group(name, description)`: Create command group
-- `get_command(name)`: Retrieve registered command
-- `get_group(name)`: Retrieve command group
-
-### Command Sync (`core/command_sync.py`)
-
-Handles Discord slash command synchronization.
-
-```python
-from core.command_sync import CommandSync
-
-sync = CommandSync()
-sync.register_module_commands(bot)
-```
-
-#### Key Methods
-- `register_module_commands(bot)`: Register all module commands
-- `sync_commands(bot, bot_name)`: Sync commands with Discord
-
-### Error Handler (`core/error_handler.py`)
-
-Provides centralized error handling.
-
-```python
-from core.error_handler import ErrorHandler, BotError
-
-class CustomError(BotError):
-    pass
-
-handler = ErrorHandler(bot)
-```
-
-#### Key Classes
-- `BotError`: Base exception class
-- `CommandError`: Command execution errors
-- `PermissionError`: Permission-related errors
-- `ConfigurationError`: Configuration errors
-- `ValidationError`: Input validation errors
-- `DatabaseError`: Database operation errors
-
-### Logging System (`core/logging.py`)
-
-Implements structured logging with JSON formatting.
-
-```python
-from core.logging import BotLogger
-
-logger = BotLogger()
-logger.get_logger("module_name")
-```
-
-#### Key Features
-- Structured JSON log output
-- Log file rotation
-- Multiple log levels
-- Command and error tracking
-
-## Feature Modules
-
-### Mod Module (`modules/mod/`)
-
-Moderation and configuration management.
-
-#### Commands
-- `/keyword-filter-config`: Configure keyword filtering
-  - View/modify filter settings
-  - Manage categories and blacklists
-  - Configure notifications
-  - Toggle dry run mode
-
-- `/mod-config`: Module-wide settings
-  - Manage whitelist roles
-  - View current settings
-  - Add/remove roles
-  - Clear configurations
-
-- `/purge`: Message deletion
-  - Delete specified number of messages
-  - Requires manage messages permission
-
-### Redeye Module (`modules/redeye/`)
-
-Profile and task management.
-
-#### Commands
-- `/redeye-profiles`: Profile management
-- `/redeye_help`: Module help information
+### RedEye (`redeye`)
+Manages late-night notifications:
+- Configurable quiet hours
+- Role-based notifications
+- Custom message formatting
+- Time zone support
 
 ## Module Development
 
-### Creating New Modules
+To create a new module:
 
-1. **Module Structure**
-   ```
-   modules/
-   └── new_module/
-       ├── __init__.py
-       ├── module.py
-       └── commands/
-   ```
+1. Create a new directory in `modules/`
+2. Implement the required interfaces:
+   - `ModuleBase` for core functionality
+   - `ConfigurableModule` for configuration support
+3. Register the module in `modules/__init__.py`
+4. Add configuration in `config/features/`
+5. Create documentation in `data/docs/`
 
-2. **Module Interface**
-   ```python
-   def setup(bot, registered_commands=None):
-       """Initialize module and register commands."""
-       if registered_commands is None:
-           registered_commands = set()
-       # Register commands
-       return registered_commands
-
-   def teardown(bot):
-       """Cleanup module resources."""
-       pass
-   ```
-
-### Best Practices
-
-1. **Command Registration**
-   - Check for existing commands
-   - Use descriptive names
-   - Implement permission checks
-   - Handle errors properly
-
-2. **Resource Management**
-   - Clean initialization
-   - Proper cleanup
-   - Resource tracking
-   - Error recovery
+Example module structure:
+```
+modules/
+  └── new_module/
+      ├── __init__.py
+      ├── module.py
+      ├── config.py
+      └── utils.py
+```
 
 ## Configuration
 
-### Environment Variables
-```env
-# Module Settings
-MOD_ENABLED=True
-REDEYE_ENABLED=True
-```
-
-### Module Settings
+Each module can define its configuration in `config/features/`:
 ```python
-# Module-specific settings
-MOD_SETTINGS = {
-    'whitelist_roles': [],
-    'filters': {}
-}
+from config.core import ConfigBase
+
+class ModuleConfig(ConfigBase):
+    def __init__(self):
+        self.enabled = True
+        self.settings = {}
+
+    @property
+    def is_enabled(self) -> bool:
+        return self.enabled
+
+    def validate(self) -> bool:
+        # Implement validation logic
+        return True
 ```
 
-## Error Handling
+## Testing
 
-### Module Errors
+Modules should include comprehensive tests:
 ```python
-class ModuleError(Exception):
-    """Base module error."""
-    pass
-
-try:
-    await module.process()
-except ModuleError as e:
-    await handle_module_error(e)
+def test_module():
+    module = NewModule()
+    assert module.is_enabled()
+    # Add more test cases
 ```
 
-## Notes
+## Best Practices
 
-- Modules must implement setup/teardown
-- Use proper error handling
-- Document public interfaces
-- Follow command registration pattern
+1. Keep modules focused and single-purpose
+2. Document all public interfaces
+3. Include error handling
+4. Add logging for important events
+5. Make configuration flexible
+6. Write comprehensive tests

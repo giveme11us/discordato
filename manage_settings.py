@@ -16,8 +16,9 @@ import json
 import argparse
 import logging
 from dotenv import load_dotenv
-from typing import Dict, Any, List
-from config.features.moderation import filter as keyword_filter_config
+from typing import Dict, Any, List, Optional
+from config.features.moderation import pinger as pinger_config
+from config.features.moderation import link_reaction as link_reaction_config
 
 # Setup logging
 logging.basicConfig(
@@ -34,11 +35,25 @@ SETTINGS_DIR = os.path.join('data', 'settings')
 
 # Modules with settings
 MODULES = [
-    'keyword_filter',
-    'link_reaction',
-    'reaction_forward',
-    'pinger'
+    'mod',
+    'online',
+    'instore',
+    'redeye',
+    'pinger',
+    'link_reaction'
 ]
+
+# Default configuration for each module
+DEFAULT_CONFIG = {
+    'mod': {
+        'enabled': True,
+        'whitelist_role_ids': [],
+        'command_cooldown': 3,
+        'max_commands_per_minute': 60
+    },
+    'pinger': pinger_config.DEFAULT_CONFIG,
+    'link_reaction': link_reaction_config.DEFAULT_CONFIG,
+}
 
 def export_settings(output_file: str) -> bool:
     """
@@ -177,7 +192,6 @@ def validate_settings() -> None:
                 
                 # Get the default settings for this module
                 default_settings = {
-                    'keyword_filter': keyword_filter_config.DEFAULT_CONFIG,
                     'link_reaction': link_reaction_config.DEFAULT_CONFIG,
                     'reaction_forward': reaction_forward_config.DEFAULT_CONFIG,
                     'pinger': pinger_config.DEFAULT_CONFIG
@@ -232,10 +246,7 @@ def reset_settings(module: str = None) -> bool:
                 logger.info(f"Backed up {settings_file} to {backup_file}")
             
             # Use the module's reset_config function
-            if module_name == 'keyword_filter':
-                import config.keyword_filter_config as keyword_filter_config
-                keyword_filter_config.reset_config()
-            elif module_name == 'link_reaction':
+            if module_name == 'link_reaction':
                 import config.link_reaction_config as link_reaction_config
                 link_reaction_config.reset_config()
             elif module_name == 'reaction_forward':

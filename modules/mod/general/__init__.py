@@ -116,8 +116,6 @@ async def setup(bot):
                 embed.add_field(
                     name="Moderation Commands",
                     value=(
-                        "`/keyword` - Manage keyword filters\n"
-                        "`/reaction` - Manage reaction settings\n"
                         "`/pinger` - Configure ping monitoring"
                     ),
                     inline=False

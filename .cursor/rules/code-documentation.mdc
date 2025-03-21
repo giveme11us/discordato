@@ -1,270 +1,271 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-# Rule Name: Code Documentation Standards
-Version: 1.0.0
-Last Updated: 2024-03-20
-Tags: #documentation #code-quality #maintainability
+# Code Documentation Guidelines
 
-## Purpose
-Establishes consistent standards for documenting code within the Discord bot project, ensuring clarity, maintainability, and facilitating collaboration among developers.
+## File Headers
 
-## Critical Requirements
-- All files must contain a header with purpose and critical information
-- All functions must have comprehensive docstrings with parameters and return values
-- In-progress or incomplete code must include TODO comments with clear next steps
-- All modules must have corresponding documentation in data/docs directory
+Every source file should start with a header comment that includes:
 
-## Documentation Structure
-
-### File Headers
 ```python
 """
-path: modules/example/example.py
-purpose: Implements the example feature functionality
-critical:
-- Requires proper initialization via setup()
-- Must be cleaned up with teardown()
-- Configuration is loaded from environment variables
+path: path/to/file.py
+purpose: One-sentence description of the file's purpose
+author: Original author's name
+date: Creation date
 """
 ```
 
-### Function Documentation
+## Function Documentation
+
+Functions should be documented using docstrings:
+
 ```python
-def process_message(message, config=None):
+def process_message(message: discord.Message) -> bool:
     """
-    Process incoming messages and apply configured actions.
-    
-    TODO List:
-    [x] Basic message parsing
-    [x] Content filtering
-    [ ] Logging enhancements
-    [ ] Rate limiting implementation
-    
-    Next Steps:
-    1. Implement rate limiting per user
-    2. Add cache for frequent messages
-    
-    Future Improvements:
-    - Performance optimization for large servers
-    - Machine learning integration for better filtering
+    Process an incoming Discord message.
     
     Args:
-        message (discord.Message): The message to process
-        config (dict, optional): Configuration parameters. Defaults to None.
+        message: The Discord message to process
         
     Returns:
-        bool: True if message was processed, False otherwise
+        bool: True if message was processed successfully
         
     Raises:
         ValueError: If message is invalid
     """
-    # Implementation
     pass
 ```
 
-### Class Documentation
+## Class Documentation
+
+Classes should have comprehensive docstrings:
+
 ```python
-class MessageProcessor:
+class MessageHandler:
     """
-    Handles the processing of Discord messages with configurable filters.
+    Handles processing and routing of Discord messages.
     
     Attributes:
-        filters (list): List of active message filters
-        config (dict): Configuration settings
-        stats (dict): Processing statistics
+        channel_id (int): ID of the channel being monitored
+        enabled (bool): Whether handler is active
         
-    TODO List:
-    [x] Basic filter implementation
-    [ ] Advanced pattern matching
-    [ ] Database integration
+    Methods:
+        process(message): Process a single message
+        enable(): Enable message handling
+        disable(): Disable message handling
     """
-    
-    def __init__(self, config=None):
-        """
-        Initialize the message processor with optional configuration.
-        
-        Args:
-            config (dict, optional): Configuration dictionary. Defaults to None.
-        """
-        # Implementation
-        pass
+    pass
 ```
 
-### Implementation Status Format
+## Constants and Enums
+
+Document constants and enums clearly:
+
 ```python
-# TODO Section:
-# [x] Completed feature
-# [~] In progress feature
-# [ ] Not started feature
-# [!] Needs review
-# [?] Needs discussion
-#
-# Next Steps:
-# 1. First step to complete
-# 2. Second step to complete
-#
-# Future Considerations:
-# - Performance improvement idea
-# - Feature enhancement idea
+# Message processing states
+class ProcessingState(Enum):
+    """Available states for message processing."""
+    PENDING = "pending"
+    PROCESSING = "processing" 
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+# Configuration constants
+MAX_RETRIES = 3  # Maximum number of processing retries
+TIMEOUT_SEC = 30  # Timeout in seconds for API calls
 ```
 
-## Module Documentation
+## Code Comments
 
-### Location
-- All module documentation must be stored in `data/docs/modules/`
-- README.md remains in the project root directory
-- Feature-specific documentation should be in relevant subdirectories
+Use comments to explain complex logic:
 
-### Format
-```markdown
-# Module Name
-Version: 1.0.0
-Last Updated: YYYY-MM-DD
+```python
+def handle_reaction(reaction: discord.Reaction) -> None:
+    # Skip reactions from bots
+    if reaction.member.bot:
+        return
+        
+    # Check if reaction meets forwarding threshold
+    if reaction.count >= FORWARD_THRESHOLD:
+        # Forward to destination channel
+        forward_message(reaction.message)
+```
 
-## Overview
-Brief description of the module and its purpose.
+## Error Handling
 
-## Features
-- Feature 1: Description
-- Feature 2: Description
+Document error cases and recovery:
 
-## Commands
-| Command | Description | Parameters |
-|---------|-------------|------------|
-| /command1 | Purpose of command | param1: Description |
-| /command2 | Purpose of command | param1: Description |
+```python
+try:
+    # Attempt to process message
+    result = process_message(message)
+except InvalidMessageError as e:
+    # Log error and skip invalid messages
+    logger.error(f"Invalid message format: {e}")
+    return False
+except APIError as e:
+    # Retry on API errors
+    logger.warning(f"API error, retrying: {e}")
+    retry_process_message(message)
+```
 
 ## Configuration
-| Setting | Description | Default |
-|---------|-------------|---------|
-| SETTING_NAME | Purpose | default_value |
 
-## Implementation Details
-Technical details about the implementation.
+Document configuration options:
 
-## Examples
-```code
-Example usage
-```
-```
-
-## Best Practices
-
-### Documentation Writing
-- Use present tense for descriptions
-- Be specific about function behavior
-- Document exceptions and edge cases
-- Keep documentation updated with code changes
-- Focus on "why" rather than "what" for complex logic
-
-### TODO Management
-- Keep TODO lists current
-- Mark completed items with [x]
-- Assign priorities to pending items
-- Include estimated complexity
-- Reference related issues or tickets
-
-### Comment Placement
-- File headers at the top of each file
-- Function/class docstrings directly after definition
-- Implementation comments inline with complex logic
-- TODO comments before the affected section
-
-## Examples
-
-### ✅ Good Documentation Example
 ```python
 """
-path: modules/keyword_filter/filter.py
-purpose: Implements regex-based message filtering with configurable actions
-critical:
-- Pattern validation is required before saving
-- Filter actions must be one of: log, notify, delete
-- Filters require a severity level
+Configuration options for message processing.
+
+Options:
+    PROCESS_DELAY: Delay between message processing in seconds
+    MAX_QUEUE_SIZE: Maximum number of messages to queue
+    RETRY_COUNT: Number of retries for failed processing
 """
 
-import re
-import logging
-from enum import Enum
+PROCESS_DELAY = 0.5
+MAX_QUEUE_SIZE = 1000
+RETRY_COUNT = 3
+```
 
-logger = logging.getLogger(__name__)
+## Logging
 
-class FilterAction(Enum):
-    """
-    Available actions for keyword filters.
-    
-    Members:
-        LOG: Only log the match
-        NOTIFY: Log and send notification
-        DELETE: Log, notify, and delete the message
-    """
-    LOG = "log"
-    NOTIFY = "notify"
-    DELETE = "delete"
+Document logging practices:
 
-class KeywordFilter:
+```python
+# Log important events
+logger.info("Starting message processor")
+logger.debug(f"Processing message {message.id}")
+logger.warning("Queue size exceeds 80%")
+logger.error("Failed to process message", exc_info=True)
+```
+
+## Type Hints
+
+Use clear type hints:
+
+```python
+from typing import List, Dict, Optional
+
+def get_messages(
+    channel_id: int,
+    limit: Optional[int] = None,
+    before: Optional[datetime] = None
+) -> List[discord.Message]:
+    """Get messages from a channel."""
+    pass
+```
+
+## Examples
+
+Include usage examples:
+
+```python
+"""
+Example usage:
+    
+    # Create message handler
+    handler = MessageHandler(channel_id=123456)
+    
+    # Process single message
+    message = await channel.fetch_message(message_id)
+    result = handler.process(message)
+    
+    # Process message batch
+    messages = await channel.history(limit=10).flatten()
+    results = handler.process_batch(messages)
+"""
+```
+
+## Testing
+
+Document test requirements:
+
+```python
+def test_message_processing():
     """
-    Regex-based message filter with configurable actions.
+    Test message processing functionality.
     
-    TODO List:
-    [x] Basic pattern matching
-    [x] Action implementation
-    [ ] Filter optimization
-    
-    Attributes:
-        pattern (re.Pattern): Compiled regex pattern
-        action (FilterAction): Action to take on match
-        severity (str): Severity level (low, medium, high)
-    """
-    
-    def __init__(self, pattern, action, severity="medium"):
-        """
-        Initialize a keyword filter.
+    Requirements:
+        - Valid Discord message object
+        - Active channel
+        - Proper permissions
         
-        Args:
-            pattern (str): Regex pattern to match
-            action (str): Action to take (log, notify, delete)
-            severity (str, optional): Severity level. Defaults to "medium".
-            
-        Raises:
-            ValueError: If pattern is invalid or action is not recognized
-        """
-        # Implementation
-        pass
+    Covers:
+        - Normal message processing
+        - Error handling
+        - Rate limiting
+    """
+    pass
 ```
 
-### ❌ Bad Documentation Example
+## Version History
+
+Track major changes:
+
 ```python
-# This is the keyword filter
-class KeywordFilter:
-    def __init__(self, pattern, action, severity="medium"):
-        # Setup filter
-        self.pattern = re.compile(pattern)
-        self.action = action
-        self.severity = severity
-    
-    # Process message
-    def process(self, message):
-        # Check if matches
-        if re.search(self.pattern, message.content):
-            # Do the action
-            if self.action == "log":
-                pass
-            # Do notification
-            elif self.action == "notify":
-                pass
-            # Delete it
-            elif self.action == "delete":
-                pass
+"""
+Version History:
+    1.0.0 - Initial implementation
+    1.1.0 - Added batch processing
+    1.2.0 - Improved error handling
+    2.0.0 - Refactored for Discord.py 2.0
+"""
 ```
 
-## Notes
-- WARNING: Undocumented code will be harder to maintain and integrate
-- NOTE: Documentation should evolve with the code
-- PERF: Well-documented code leads to better performance optimizations
+## Dependencies
 
-## Tags
-#docstrings #comments #todos #code-quality 
+Document dependencies:
+
+```python
+"""
+Dependencies:
+    - discord.py >= 2.0.0
+    - aiohttp >= 3.7.4
+    - python-dotenv >= 0.19.0
+    
+Optional:
+    - uvloop (performance)
+    - orjson (performance)
+"""
+```
+
+## Security
+
+Document security considerations:
+
+```python
+"""
+Security Notes:
+    - Validate all user input
+    - Sanitize message content
+    - Check permissions before actions
+    - Log security events
+"""
+```
+
+## Performance
+
+Document performance characteristics:
+
+```python
+"""
+Performance Notes:
+    - O(n) time complexity
+    - Caches up to 1000 messages
+    - Rate limited to 100 req/min
+    - Uses connection pooling
+"""
+```
+
+## Maintenance
+
+Document maintenance requirements:
+
+```python
+"""
+Maintenance:
+    - Clear cache daily
+    - Update permissions weekly
+    - Monitor error rates
+    - Check resource usage
+"""
+```

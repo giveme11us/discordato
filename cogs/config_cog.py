@@ -12,7 +12,6 @@ import logging
 from modules.features.mod.pinger.config_cmd import setup_config_cmd as setup_pinger_config
 from modules.features.mod.reaction_forward.config_cmd import setup_config_cmd as setup_reaction_forward_config
 from modules.features.mod.link_reaction.config_cmd import link_reaction_config
-from modules.features.mod.keyword_filter.config_cmd import keyword_filter_config, keyword_filter_quicksetup
 from modules.features.mod.mod_config_cmd import setup_config_cmd as setup_mod_config
 
 logger = logging.getLogger('discord_bot.cogs.config_cog')
@@ -38,18 +37,6 @@ class ConfigCog(commands.Cog):
             logger.info("Registered link-reaction-config command")
         except Exception as e:
             logger.error(f"Failed to register link-reaction-config command: {str(e)}")
-        
-        try:
-            self.bot.tree.add_command(keyword_filter_config)
-            logger.info("Registered keyword-filter-config command")
-        except Exception as e:
-            logger.error(f"Failed to register keyword-filter-config command: {str(e)}")
-        
-        try:
-            self.bot.tree.add_command(keyword_filter_quicksetup)
-            logger.info("Registered keyword-filter-quicksetup command")
-        except Exception as e:
-            logger.error(f"Failed to register keyword-filter-quicksetup command: {str(e)}")
     
     async def cog_load(self):
         """

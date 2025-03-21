@@ -520,6 +520,11 @@ def setup_link_reaction(bot):
     logger.info(f"Whitelisted categories: {category_ids}")
     logger.info(f"Blacklisted channels: {blacklist_channel_ids}")
     
+    # Register commands
+    from .commands import setup_commands
+    setup_commands(bot)
+    logger.info("Registered link reaction commands")
+    
     # Log the stores configuration
     all_monitored_channels = set()
     

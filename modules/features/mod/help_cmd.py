@@ -29,15 +29,15 @@ async def handle_mod_help(interaction):
     
     # Add general information
     embed.add_field(
-        name="📝 Keyword Filter",
-        value="Filter messages containing specific keywords.\n`/keyword` - Configure keyword filtering",
-        inline=False
+        name="🔄 Reaction System",
+        value="Forward messages and handle reactions.\n`/reaction` - Configure reaction system",
+        inline=True
     )
     
     embed.add_field(
-        name="↪️ Reaction Forward",
-        value="Forward messages with specific reactions to a designated channel.\n`/reaction` - Configure reaction forwarding",
-        inline=False
+        name="🔔 Pinger",
+        value="Monitor and notify about pings.\n`/pinger` - Configure ping monitoring",
+        inline=True
     )
     
     embed.add_field(
@@ -46,16 +46,9 @@ async def handle_mod_help(interaction):
         inline=False
     )
     
-    embed.add_field(
-        name="🔔 Pinger",
-        value="Monitor and notify about @mentions in messages.\n`/pinger` - Configure mention notifications",
-        inline=False
-    )
-    
     # Add more detailed command examples
     examples = (
         "**Examples:**\n"
-        "`/keyword` - Show current keyword filter configuration\n"
         "`/reaction whitelisted_category_id:123456789` - Set category to monitor\n"
         "`/pinger channel:123456789 everyone:true` - Configure ping notifications\n"
         "`/luisaviaroma_adder channel_ids:123456789` - Configure store monitoring"

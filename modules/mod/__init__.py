@@ -117,7 +117,7 @@ async def setup(bot, registered_commands=None):
         logger.info("Registered command: general")
         
     # Load submodules
-    submodules = ['keyword_filter', 'link_reaction', 'pinger']
+    submodules = ['pinger', 'reaction']
     for submodule in submodules:
         try:
             if submodule not in loaded_submodules:
