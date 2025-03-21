@@ -3,6 +3,21 @@ Bot Manager
 
 This module handles bot initialization, lifecycle management,
 and operational scenario determination.
+
+The Bot Manager is responsible for:
+1. Initializing Discord bot instances
+2. Managing bot lifecycles (start/stop)
+3. Loading and managing modules
+4. Synchronizing commands
+5. Routing commands to appropriate handlers
+
+Critical:
+- Requires proper token configuration in environment
+- Must be initialized before any bot operations
+- Handles cleanup of resources on shutdown
+
+Classes:
+    BotManager: Main class for managing Discord bot instances
 """
 
 import logging
@@ -23,12 +38,41 @@ class BotManager:
     """
     Manages the lifecycle and configuration of Discord bot instances.
     Handles different operational scenarios based on token configuration.
+    
+    The BotManager class is the central component responsible for:
+    - Bot initialization and configuration
+    - Module discovery and loading
+    - Command synchronization
+    - Command routing
+    - Resource management
+    
+    Attributes:
+        bots (dict): Dictionary of bot instances keyed by name
+        module_loader (ModuleLoader): Instance for loading bot modules
+        command_sync (CommandSync): Instance for syncing Discord commands
+        command_router (CommandRouter): Instance for routing commands
+        modules (list): List of discovered modules
+        scenario (str): Current operational scenario
+        
+    Critical:
+        - Must call start() to begin bot operations
+        - Must call stop() for proper cleanup
+        - Requires valid token configuration
     """
     
     def __init__(self):
         """
         Initialize the bot manager.
-        Determines the operational scenario and sets up bot instances.
+        
+        This method:
+        1. Sets up core components (module loader, command sync, router)
+        2. Discovers available modules
+        3. Determines operational scenario
+        4. Initializes bot instances
+        
+        Raises:
+            ConfigurationError: If required configuration is missing
+            ModuleLoadError: If module discovery fails
         """
         self.bots = {}
         self.module_loader = ModuleLoader()
@@ -50,8 +94,21 @@ class BotManager:
         """
         Determine the operational scenario based on token configuration.
         
+        This method analyzes the available token configuration to determine
+        how the bot should operate. It supports three scenarios:
+        - SINGLE: Single bot with one token
+        - MULTI: Multiple bots with different tokens
+        - PARTIAL: Partial operation with subset of available tokens
+        
         Returns:
-            str: 'single', 'multi', or 'partial'
+            str: The determined scenario ('SINGLE', 'MULTI', or 'PARTIAL')
+            
+        Raises:
+            ConfigurationError: If no valid tokens are found
+            
+        Note:
+            The scenario affects how the bot manager initializes and
+            manages bot instances throughout their lifecycle.
         """
         main_token = get_token()
         if not main_token:
@@ -78,7 +135,28 @@ class BotManager:
     
     def _initialize_bots(self):
         """
-        Initialize bot instances based on the operational scenario.
+        Initialize bot instances based on the determined scenario.
+        
+        This method creates and configures Discord bot instances according to
+        the operational scenario. For each bot, it:
+        1. Creates a Discord client instance
+        2. Configures intents and permissions
+        3. Sets up event handlers
+        4. Loads appropriate modules
+        5. Registers basic commands
+        
+        The initialization process varies by scenario:
+        - SINGLE: Creates one bot with all modules
+        - MULTI: Creates multiple bots with specific module sets
+        - PARTIAL: Creates bots for available tokens
+        
+        Raises:
+            ConfigurationError: If bot initialization fails
+            ModuleLoadError: If module loading fails
+            
+        Note:
+            This is an internal method called during BotManager initialization.
+            The actual bot connections are established later by the start() method.
         """
         intents = discord.Intents.default()
         intents.message_content = True
@@ -138,11 +216,32 @@ class BotManager:
     
     def start(self):
         """
-        Start all bot instances.
+        Start all initialized bot instances.
+        
+        This method:
+        1. Validates bot configurations
+        2. Synchronizes commands with Discord
+        3. Establishes connections for all bots
+        4. Starts background tasks and event loops
+        
+        The startup process is handled differently based on the scenario:
+        - SINGLE: Starts one bot synchronously
+        - MULTI/PARTIAL: Starts multiple bots concurrently
+        
+        Returns:
+            bool: True if all bots started successfully, False otherwise
+            
+        Raises:
+            ConnectionError: If connection to Discord fails
+            RuntimeError: If bot startup fails
+            
+        Note:
+            This method is blocking and should be called after initialization
+            is complete. Use stop() to properly shutdown the bots.
         """
         if not self.bots:
             logger.error("No bots to start")
-            return
+            return False
         
         # In development mode, sync commands first
         if is_development():
@@ -156,24 +255,63 @@ class BotManager:
             
             # Run the bot
             bot.run(token)
+        
+        return True
     
     def stop(self):
         """
-        Stop all bot instances.
+        Stop all running bot instances and perform cleanup.
+        
+        This method:
+        1. Gracefully disconnects all bots from Discord
+        2. Cancels running tasks and background jobs
+        3. Cleans up resources and connections
+        4. Resets internal state
+        
+        The shutdown process ensures:
+        - All bots are properly disconnected
+        - Resources are released
+        - No lingering connections remain
+        
+        Returns:
+            bool: True if all bots stopped successfully, False otherwise
+            
+        Note:
+            This method should be called before program termination to
+            ensure proper cleanup of resources.
         """
         for bot_name, bot in self.bots.items():
             logger.info(f"Stopping bot: {bot_name}")
             # Close the bot
             bot.close()
+        
+        return True
 
     def setup_bot(self, bot_name, token, modules):
         """
-        Set up and configure a bot with the given name, token, and modules.
+        Set up a new bot instance with specified configuration.
+        
+        This method creates and configures a new Discord bot instance with:
+        1. Basic configuration (prefix, description, intents)
+        2. Module loading and initialization
+        3. Command registration
+        4. Event handler setup
         
         Args:
-            bot_name: The name of the bot.
-            token: The Discord token for the bot.
-            modules: A list of module names to load for this bot.
+            bot_name (str): Unique identifier for the bot instance
+            token (str): Discord bot token for authentication
+            modules (list): List of module names to load for this bot
+            
+        Returns:
+            commands.Bot: Configured bot instance
+            
+        Raises:
+            ValueError: If bot_name already exists or token is invalid
+            ModuleLoadError: If module loading fails
+            
+        Note:
+            The bot is not started automatically. Call start_bot() to
+            establish the Discord connection.
         """
         intents = discord.Intents.default()
         intents.message_content = True  # Required for accessing message content
@@ -202,10 +340,27 @@ class BotManager:
 
     def start_bot(self, bot_name):
         """
-        Start a specific bot.
+        Start a specific bot instance by name.
+        
+        This method:
+        1. Validates the bot exists and is configured
+        2. Synchronizes commands with Discord
+        3. Establishes the Discord connection
+        4. Starts event loop and background tasks
         
         Args:
-            bot_name: The name of the bot to start.
+            bot_name (str): Name of the bot instance to start
+            
+        Returns:
+            bool: True if bot started successfully, False otherwise
+            
+        Raises:
+            KeyError: If bot_name doesn't exist
+            ConnectionError: If Discord connection fails
+            
+        Note:
+            This method is blocking. The bot will run until stopped
+            or disconnected.
         """
         if bot_name not in self.bots:
             logger.error(f"Bot {bot_name} not found")

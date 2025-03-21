@@ -7,7 +7,7 @@ alwaysApply: true
 Version: 1.0.0
 Last Updated: 2024-03-20
 Tags: #project-context #architecture #framework
-
+always ask before edit the /Users/ivansposato/Documents/projects/easycopeu/discord/discordato/.env file
 ## Purpose
 Provides essential context about the Discord bot project's architecture, design philosophy, and core components to enable better understanding and context-aware suggestions.
 

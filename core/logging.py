@@ -1,10 +1,23 @@
 """
-path: core/logging.py
-purpose: Implements comprehensive logging system with structured logging and rotation
-critical:
+Logging System
+
+This module implements a comprehensive logging system for the Discord bot.
+
+The Logging System is responsible for:
+1. Structured log output in JSON format
+2. Log file rotation and management
+3. Multiple log levels and handlers
+4. Command and error tracking
+
+Critical:
 - Provides structured logging
 - Implements log rotation
 - Supports multiple log levels and handlers
+- Ensures proper log file management
+
+Classes:
+    StructuredFormatter: JSON log formatter
+    BotLogger: Main logging system
 """
 
 import os
@@ -16,19 +29,49 @@ from datetime import datetime
 from pathlib import Path
 
 class StructuredFormatter(logging.Formatter):
-    """Formatter that outputs logs in a structured JSON format."""
+    """
+    Formatter that outputs logs in a structured JSON format.
+    
+    This formatter:
+    - Converts log records to JSON
+    - Adds timestamp and context
+    - Handles exception information
+    - Supports custom fields
+    
+    Attributes:
+        default_time_format (str): Time format string
+        default_msec_format (str): Millisecond format string
+        
+    Critical:
+        - Must handle all log record attributes
+        - Should escape special characters
+        - Must format exceptions properly
+        - Should maintain consistent JSON structure
+    """
     
     def format(self, record: logging.LogRecord) -> str:
         """
         Format the log record as JSON.
         
+        This method:
+        1. Extracts standard log fields
+        2. Adds timestamp and context
+        3. Handles exceptions
+        4. Formats as JSON string
+        
         Args:
-            record: The log record to format
+            record (logging.LogRecord): The log record to format
             
         Returns:
-            JSON formatted log string
+            str: JSON formatted log string
+            
+        Note:
+            The output includes:
+            - Standard log fields (time, level, message)
+            - Exception information if present
+            - Custom fields from extra/context
+            - Source location (module, function, line)
         """
-        # Get the original format data
         data = {
             'timestamp': datetime.fromtimestamp(record.created).isoformat(),
             'level': record.levelname,
@@ -39,7 +82,6 @@ class StructuredFormatter(logging.Formatter):
             'line': record.lineno
         }
         
-        # Add exception info if present
         if record.exc_info:
             data['exception'] = {
                 'type': record.exc_info[0].__name__,
@@ -47,14 +89,32 @@ class StructuredFormatter(logging.Formatter):
                 'traceback': self.formatException(record.exc_info)
             }
             
-        # Add extra fields
         if hasattr(record, 'details'):
             data['details'] = record.details
             
         return json.dumps(data)
 
 class BotLogger:
-    """Centralized logging for the bot."""
+    """
+    Main logging system for the Discord bot.
+    
+    This class manages:
+    - Log file configuration and rotation
+    - Multiple log levels and handlers
+    - Structured and simple formatting
+    - Command and error tracking
+    
+    Attributes:
+        log_dir (Path): Directory for log files
+        max_bytes (int): Maximum log file size
+        backup_count (int): Number of backup files
+        
+    Critical:
+        - Must handle concurrent writes safely
+        - Should manage disk space efficiently
+        - Must preserve error context
+        - Should handle log rotation properly
+    """
     
     def __init__(
         self,
@@ -63,39 +123,65 @@ class BotLogger:
         backup_count: int = 5
     ):
         """
-        Initialize the logger.
+        Initialize the logging system.
+        
+        This method:
+        1. Sets up log directory
+        2. Configures root logger
+        3. Creates log handlers
+        4. Sets up log rotation
         
         Args:
-            log_dir: Directory to store log files
-            max_bytes: Maximum size of each log file
-            backup_count: Number of backup files to keep
+            log_dir (str): Directory for log files
+            max_bytes (int): Maximum size per log file (default: 10MB)
+            backup_count (int): Number of backup files (default: 5)
+            
+        Note:
+            Creates log directory if it doesn't exist
         """
         self.log_dir = Path(log_dir)
         self.max_bytes = max_bytes
         self.backup_count = backup_count
         
-        # Create log directory if it doesn't exist
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Configure root logger
         self._configure_root_logger()
-        
-        # Set up handlers
         self._setup_handlers()
         
     def _configure_root_logger(self) -> None:
-        """Configure the root logger."""
-        # Get root logger
+        """
+        Configure the root logger.
+        
+        This method:
+        1. Sets base log level to DEBUG
+        2. Removes existing handlers
+        3. Prepares for new configuration
+        
+        Note:
+            This is an internal method called during initialization
+        """
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
         
-        # Remove existing handlers
         for handler in logger.handlers[:]:
             logger.removeHandler(handler)
             
     def _setup_handlers(self) -> None:
-        """Set up log handlers."""
-        # Create formatters
+        """
+        Set up log handlers.
+        
+        This method:
+        1. Creates structured and simple formatters
+        2. Sets up file handlers for different levels
+        3. Configures log rotation
+        4. Adds console output handler
+        
+        Note:
+            Creates separate handlers for:
+            - Debug logs (all levels)
+            - Info logs (info and above)
+            - Error logs (error and critical)
+            - Console output (info and above)
+        """
         structured_formatter = StructuredFormatter()
         simple_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -133,7 +219,6 @@ class BotLogger:
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(simple_formatter)
         
-        # Add handlers to root logger
         root_logger = logging.getLogger()
         root_logger.addHandler(debug_handler)
         root_logger.addHandler(error_handler)
@@ -142,13 +227,22 @@ class BotLogger:
         
     def get_logger(self, name: str) -> logging.Logger:
         """
-        Get a logger with the given name.
+        Get a configured logger instance.
+        
+        This method:
+        1. Gets or creates logger
+        2. Inherits root configuration
+        3. Returns configured instance
         
         Args:
-            name: Name for the logger
+            name (str): Name for the logger
             
         Returns:
-            Configured logger instance
+            logging.Logger: Configured logger instance
+            
+        Note:
+            Creates a new logger if one doesn't exist
+            Inherits handlers from root logger
         """
         return logging.getLogger(name)
         
@@ -165,14 +259,26 @@ class BotLogger:
         """
         Log a command execution.
         
+        This method:
+        1. Records command metadata
+        2. Tracks execution status
+        3. Includes context details
+        
         Args:
-            logger: Logger instance to use
-            command_name: Name of the command
-            user: User who executed the command
-            guild: Guild where command was executed
-            channel: Channel where command was executed
-            status: Command execution status
-            details: Additional command details
+            logger (logging.Logger): Logger instance
+            command_name (str): Name of the command
+            user (str): User who executed command
+            guild (str): Guild where command was executed
+            channel (str): Channel where command was executed
+            status (str): Command execution status
+            details (dict, optional): Additional command details
+            
+        Note:
+            Status should be one of:
+            - 'started'
+            - 'completed'
+            - 'failed'
+            - 'denied'
         """
         log_data = {
             'command': command_name,
@@ -183,12 +289,9 @@ class BotLogger:
         }
         
         if details:
-            log_data['details'] = details
+            log_data.update(details)
             
-        logger.info(
-            f"Command executed: {command_name}",
-            extra={'details': log_data}
-        )
+        logger.info('Command execution', extra={'details': log_data})
         
     def log_error(
         self,
@@ -199,23 +302,32 @@ class BotLogger:
         """
         Log an error with context.
         
+        This method:
+        1. Records error information
+        2. Includes stack trace
+        3. Adds context details
+        
         Args:
-            logger: Logger instance to use
-            error: The error that occurred
-            context: Additional context about the error
+            logger (logging.Logger): Logger instance
+            error (Exception): The error to log
+            context (dict, optional): Additional error context
+            
+        Note:
+            Context should include relevant information
+            to help diagnose the error
         """
-        log_data = {
-            'error_type': error.__class__.__name__,
+        error_data = {
+            'error_type': type(error).__name__,
             'error_message': str(error)
         }
         
         if context:
-            log_data['context'] = context
+            error_data.update(context)
             
         logger.error(
-            f"Error occurred: {str(error)}",
+            'Error occurred',
             exc_info=error,
-            extra={'details': log_data}
+            extra={'details': error_data}
         )
 
 # Create global logger instance
@@ -223,12 +335,16 @@ bot_logger = BotLogger()
 
 def get_logger(name: str) -> logging.Logger:
     """
-    Get a logger with the given name.
+    Get a configured logger instance.
     
     Args:
-        name: Name for the logger
+        name (str): Name for the logger
         
     Returns:
-        Configured logger instance
+        logging.Logger: Configured logger instance
+        
+    Note:
+        This is the main entry point for getting loggers
+        in other modules.
     """
     return bot_logger.get_logger(name) 

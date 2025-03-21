@@ -1,170 +1,210 @@
 # Installation Guide
 
 ## Prerequisites
-- Python 3.8 or higher
-- pip (Python package installer)
-- Git
-- A Discord account and application
-- Basic knowledge of terminal/command line
 
-## Step 1: Discord Application Setup
+Before installing the bot, ensure you have the following prerequisites:
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click "New Application" and name your bot
-3. Go to the "Bot" section and click "Add Bot"
-4. Copy your bot token (you'll need this later)
-5. Enable necessary Privileged Gateway Intents:
-   - Presence Intent
-   - Server Members Intent
-   - Message Content Intent
+1. **Python 3.8+**
+   - Download from [python.org](https://python.org)
+   - Verify installation: `python --version`
 
-## Step 2: Clone the Repository
+2. **pip (Python package manager)**
+   - Usually comes with Python
+   - Verify installation: `pip --version`
+
+3. **Git**
+   - Download from [git-scm.com](https://git-scm.com)
+   - Verify installation: `git --version`
+
+4. **Discord Developer Account**
+   - Create at [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create a new application
+   - Create a bot user
+   - Get your bot token
+
+## Installation Steps
+
+### 1. Clone the Repository
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/discord-bot.git
-cd discord-bot
+git clone https://github.com/yourusername/discordbot.git
 
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Navigate to project directory
+cd discordbot
 ```
 
-## Step 3: Install Dependencies
+### 2. Create Virtual Environment
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows
+venv\Scripts\activate
+# Unix/MacOS
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
 
 ```bash
 # Install required packages
 pip install -r requirements.txt
 ```
 
-## Step 4: Configuration
+### 4. Configure Environment Variables
 
-1. Create a `.env` file in the project root:
-```bash
-cp .env.example .env
-```
+Create a `.env` file in the project root:
 
-2. Edit `.env` with your settings:
 ```env
-# Required Settings
-DISCORD_TOKEN=your_bot_token_here
-GUILD_IDS=server_id1,server_id2
+# Bot Configuration
+DISCORD_BOT_TOKEN=your_bot_token_here
+COMMAND_PREFIX=/
+GUILD_IDS=guild_id1,guild_id2
+DEV_GUILD_ID=your_dev_guild_id
 
-# Feature Settings
-EMBED_COLOR=57fa1
-MOD_WHITELIST_ROLE_IDS=role_id1,role_id2
-REDEYE_WHITELIST_ROLE_IDS=role_id3,role_id4
+# Module Settings
+ENABLED_MODULES=mod,redeye
+COMMAND_COOLDOWN=3
+MAX_COMMANDS_PER_MINUTE=60
 
-# Optional Settings
-LOG_LEVEL=INFO
-COMMAND_PREFIX=!
+# Development Settings
+DEBUG_LOGGING=True
 ```
 
-## Step 5: Database Setup (Optional)
-If using database features:
-```bash
-# Initialize database
-python tools/db_init.py
-```
-
-## Step 6: Run the Bot
+### 5. Initialize the Bot
 
 ```bash
 # Start the bot
-python discord_bot.py
+python bot.py
 ```
 
-## Step 7: Invite Bot to Server
+## Module Configuration
 
-1. Go back to Discord Developer Portal
-2. Select your application
-3. Go to OAuth2 → URL Generator
-4. Select scopes:
-   - `bot`
-   - `applications.commands`
-5. Select required permissions:
-   - Send Messages
+### Core Modules
+Core modules are installed by default:
+- Command Router
+- Command Sync
+- Error Handler
+- Logging System
+
+### Feature Modules
+
+1. **Mod Module**
+   ```env
+   # Enable mod module
+   ENABLED_MODULES=mod
+
+   # Keyword filter configuration
+   FILTER_DEFAULT_CONFIG_ENABLED=False
+   FILTER_DEFAULT_CONFIG_DRY_RUN=True
+   ```
+
+2. **Redeye Module**
+   ```env
+   # Enable redeye module
+   ENABLED_MODULES=redeye
+   ```
+
+## Discord Setup
+
+### 1. Create Application
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click "New Application"
+3. Name your application
+4. Save the Application ID
+
+### 2. Create Bot User
+
+1. Go to "Bot" section
+2. Click "Add Bot"
+3. Save the Bot Token
+4. Enable required Intents:
+   - Message Content Intent
+   - Server Members Intent
+   - Presence Intent
+
+### 3. Invite Bot to Server
+
+1. Go to "OAuth2" section
+2. Select "bot" scope
+3. Select required permissions:
    - Manage Messages
+   - Read Messages/View Channels
+   - Send Messages
    - Read Message History
    - Add Reactions
-   - (Add other permissions as needed)
-6. Copy and use the generated URL to invite the bot
+4. Copy and use the generated URL
+
+## Post-Installation
+
+### 1. Verify Bot Status
+
+1. Check bot is online in Discord
+2. Test basic commands:
+   ```
+   /ping - Check bot latency
+   /help - View available commands
+   ```
+3. Check log files in `logs/` directory
+
+### 2. Configure Modules
+
+1. Configure mod module:
+   ```
+   /mod-config - Configure module settings
+   /keyword-filter-config - Set up keyword filtering
+   ```
+
+2. Configure redeye module:
+   ```
+   /redeye-profiles - Manage profiles
+   /redeye_help - View module help
+   ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **ModuleNotFoundError**
-   ```
-   Solution: Ensure you're in the virtual environment and have run pip install
-   ```
+1. **Bot Won't Start**
+   - Check `.env` configuration
+   - Verify bot token
+   - Check Python version
+   - Check dependencies
 
-2. **Discord.py Errors**
-   ```
-   Solution: Check if you've enabled the required intents
-   ```
+2. **Command Sync Issues**
+   - Verify guild IDs
+   - Check bot permissions
+   - Enable required intents
+   - Check error logs
 
-3. **Permission Errors**
-   ```
-   Solution: Verify bot role permissions in your Discord server
-   ```
-
-### Environment Setup Issues
-
-1. **Virtual Environment**
-   ```bash
-   # If venv creation fails:
-   python -m pip install --upgrade pip
-   python -m pip install virtualenv
-   ```
-
-2. **Package Installation**
-   ```bash
-   # If pip install fails:
-   pip install --upgrade pip setuptools wheel
-   pip install -r requirements.txt
-   ```
-
-## Next Steps
-
-1. Read the [Configuration Guide](configuration.md) for detailed setup
-2. Check the [Command Reference](commands.md) for available commands
-3. Visit [Troubleshooting](troubleshooting.md) if you encounter issues
-
-## Development Setup
-
-For developers who want to contribute:
-
-1. Install development dependencies:
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-
-2. Set up pre-commit hooks:
-   ```bash
-   pre-commit install
-   ```
-
-3. Configure your IDE:
-   - Use Python 3.8+
-   - Enable linting (flake8)
-   - Enable type checking (mypy)
-   - Set up black formatter
+3. **Module Issues**
+   - Check module is enabled
+   - Verify permissions
+   - Check configuration
+   - Review logs
 
 ## Security Notes
 
-- Never share your bot token
-- Keep `.env` file secure
-- Regularly update dependencies
-- Monitor bot permissions
+1. **Token Security**
+   - Never share bot token
+   - Use environment variables
+   - Rotate if compromised
+   - Monitor access
 
-## Support
+2. **Permission Management**
+   - Use minimal permissions
+   - Regular audit
+   - Monitor changes
+   - Document access
 
-If you need help:
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue with:
-   - Python version
-   - OS details
-   - Error messages
-   - Steps to reproduce 
+## Notes
+
+- Keep documentation updated
+- Monitor Discord updates
+- Regular security checks
+- Maintain backups
+- Test regularly 

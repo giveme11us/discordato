@@ -1,201 +1,170 @@
-# Command Reference Guide
+# Discord Bot Commands Guide
 
-## Overview
-This guide details all available bot commands, their usage, and required permissions.
+## General Commands
 
-## Command Categories
+### Basic Commands
 
-### General Commands
-| Command | Description | Usage | Permissions |
-|---------|-------------|-------|-------------|
-| `/general` | View bot status and configuration | `/general` | Moderator |
-| `/help` | Display help information | `/help [command]` | Everyone |
-| `/ping` | Check bot latency | `/ping` | Everyone |
+#### `/ping`
+- **Description**: Check if the bot is responsive and view latency
+- **Usage**: `/ping`
+- **Response**: Shows the bot's current response time in milliseconds
+- **Permissions**: Everyone
 
-### Moderation Commands
-| Command | Description | Usage | Permissions |
-|---------|-------------|-------|-------------|
-| `/keyword` | Manage keyword filters | `/keyword [add/remove/list]` | Moderator |
-| `/reaction` | Manage reaction settings | `/reaction [enable/disable]` | Moderator |
-| `/pinger` | Configure ping monitoring | `/pinger [settings]` | Moderator |
+#### `/hi`
+- **Description**: Get a friendly greeting from the bot
+- **Usage**: `/hi`
+- **Response**: Random friendly greeting message
+- **Permissions**: Everyone
 
-### E-commerce Commands
-| Command | Description | Usage | Permissions |
-|---------|-------------|-------|-------------|
-| `/redeye` | Manage Redeye features | `/redeye [subcommand]` | Redeye Role |
-| `/luisaviaroma` | Manage LuisaViaRoma features | `/luisaviaroma [subcommand]` | Moderator |
+#### `/help [command]`
+- **Description**: Display help information about commands
+- **Usage**: 
+  - `/help` - Show all available commands
+  - `/help command` - Show help for a specific command
+- **Parameters**:
+  - `command` (optional): The command to get help for
+- **Permissions**: Everyone
 
-## Detailed Command Usage
+#### `/number [min_value] [max_value]`
+- **Description**: Generate a random number within a specified range
+- **Usage**: `/number min_value max_value`
+- **Parameters**:
+  - `min_value` (optional): The minimum value (default: 1)
+  - `max_value` (optional): The maximum value (default: 100)
+- **Permissions**: Everyone
 
-### Keyword Filter Commands
-```
-/keyword add <pattern> [action] [notify]
-/keyword remove <pattern>
-/keyword list
-/keyword test <message>
-```
+### Status Commands
 
-Options:
-- `pattern`: Text or regex pattern to match
-- `action`: delete/warn/notify (default: notify)
-- `notify`: true/false - send notifications (default: true)
+#### `/general`
+- **Description**: View bot status and configuration overview
+- **Usage**: `/general`
+- **Response**: Shows current status of all enabled modules and configurations
+- **Permissions**: Moderator
 
-Example:
-```
-/keyword add "spam message" delete true
-```
+## Moderation Commands
 
-### Reaction Commands
-```
-/reaction enable [channel] [category]
-/reaction disable [channel] [category]
-/reaction settings
-```
+### Message Management
 
-Options:
-- `channel`: Specific channel to configure
-- `category`: Category to configure
+#### `/purge [count]`
+- **Description**: Delete a specified number of messages in the current channel
+- **Usage**: `/purge count`
+- **Parameters**:
+  - `count` (optional): Number of messages to delete (default: 10, max: 100)
+- **Permissions**: Manage Messages or Administrator
 
-Example:
-```
-/reaction enable #announcements
-```
+### Keyword Filter
 
-### Pinger Commands
-```
-/pinger monitor [everyone/here/roles] [enable/disable]
-/pinger channel <set/remove> <channel>
-/pinger whitelist <add/remove> <role>
-```
+#### `/keyword-filter-config`
+- **Description**: Configure the keyword filter feature
+- **Usage**: `/keyword-filter-config action [filter_id] [setting] [value]`
+- **Parameters**:
+  - `action`: Choose from:
+    - `view` - View current configuration
+    - `enable` - Enable the feature
+    - `disable` - Disable the feature
+    - `categories` - Manage monitored categories
+    - `blacklist` - Manage blacklisted channels
+    - `notification` - Configure notifications
+    - `dry_run` - Toggle dry run mode
+    - `filters` - Manage filters
+  - `filter_id` (optional): The filter ID when configuring specific filters
+  - `setting` (optional): The setting to modify
+  - `value` (optional): The new value
+- **Permissions**: Administrator
 
-Example:
-```
-/pinger monitor everyone enable
-/pinger channel set #notifications
-```
+#### `/keyword-filter-quicksetup`
+- **Description**: Quick setup for keyword filter with a single command
+- **Usage**: `/keyword-filter-quicksetup source_channel notification_channel keywords`
+- **Parameters**:
+  - `source_channel`: Channel or category ID to monitor
+  - `notification_channel`: Channel ID for notifications
+  - `keywords`: Comma-separated list of keywords (e.g., 'test,hello,example')
+- **Permissions**: Administrator
 
-### Redeye Commands
-```
-/redeye profile <create/edit/delete>
-/redeye monitor <add/remove> <url>
-/redeye settings
-```
+### Reaction System
 
-Example:
-```
-/redeye profile create
-/redeye monitor add https://www.redeye.co.uk/product/123
-```
+#### `/reaction-forward-config`
+- **Description**: Configure the reaction forward feature
+- **Usage**: `/reaction-forward-config setting [value]`
+- **Parameters**:
+  - `setting`: Choose from:
+    - `view` - View current configuration
+    - `enable` - Enable the feature
+    - `disable` - Disable the feature
+    - `forwarding` - Toggle forwarding
+    - `categories` - Manage categories
+    - `blacklist` - Manage blacklist
+  - `value` (optional): New value for the setting
+- **Permissions**: Administrator
 
-### LuisaViaRoma Commands
-```
-/luisaviaroma adder <url>
-/luisaviaroma remover <url>
-/luisaviaroma list
-```
+#### `/link-reaction-config`
+- **Description**: Configure the link reaction feature and manage store settings
+- **Usage**: `/link-reaction-config action [store_id] [setting] [value]`
+- **Parameters**:
+  - `action`: Choose from:
+    - `view` - View configuration
+    - `enable` - Enable feature
+    - `disable` - Disable feature
+    - `categories` - Manage categories
+    - `blacklist` - Manage blacklist
+    - `stores` - Manage stores
+  - `store_id` (optional): Store ID for store-specific settings
+  - `setting` (optional): Setting to modify
+  - `value` (optional): New value
+- **Permissions**: Administrator
 
-Example:
-```
-/luisaviaroma adder https://www.luisaviaroma.com/item/123
-```
+### Ping Monitoring
 
-## Permission Levels
+#### `/pinger-config`
+- **Description**: Configure the pinger feature
+- **Usage**: `/pinger-config setting [value]`
+- **Parameters**:
+  - `setting`: Choose from:
+    - `view` - View current configuration
+    - `channel` - Set notification channel
+    - `whitelist` - Manage whitelist roles
+    - `everyone` - Configure @everyone mentions
+    - `here` - Configure @here mentions
+  - `value` (optional): New value for the setting
+- **Permissions**: Administrator
 
-### Role-Based Permissions
-- **Everyone**: Basic commands
-- **Moderator**: All moderation commands
-- **Redeye Role**: Redeye-specific commands
-- **Admin**: All commands
+### Module Configuration
 
-### Environment Variables
-Configure role IDs in `.env`:
-```env
-MOD_WHITELIST_ROLE_IDS=role_id1,role_id2
-REDEYE_WHITELIST_ROLE_IDS=role_id3,role_id4
-```
+#### `/mod-config`
+- **Description**: Configure module-wide settings
+- **Usage**: `/mod-config setting action [value]`
+- **Parameters**:
+  - `setting`: Currently supports:
+    - `whitelist` - Manage whitelist roles
+  - `action`: Choose from:
+    - `view` - View current settings
+    - `add` - Add role
+    - `remove` - Remove role
+    - `clear` - Clear all roles
+  - `value` (optional): Role ID or mention
+- **Permissions**: Administrator
 
-## Command Cooldowns
-Some commands have cooldowns to prevent abuse:
-- `/ping`: 5 seconds
-- `/keyword test`: 10 seconds
-- Monitoring commands: 30 seconds
+## Notes
 
-## Error Handling
-Commands will return clear error messages for:
-- Missing permissions
-- Invalid input
-- Rate limiting
-- API errors
+1. **Permission Levels**:
+   - Everyone: All users can use these commands
+   - Moderator: Users with whitelisted roles
+   - Administrator: Server administrators only
+   - Manage Messages: Users with message management permissions
 
-## Examples
+2. **Command Usage Tips**:
+   - Parameters in `[]` are optional
+   - Use `/help command` to get detailed help for any command
+   - Most configuration commands support a `view` action to check current settings
 
-### Setting Up Keyword Filtering
-```
-# Add a filter for spam links
-/keyword add "https?://\S+" delete true
+3. **Configuration Best Practices**:
+   - Always verify changes after configuration
+   - Use `view` action before making changes
+   - Keep track of configured channels and roles
+   - Test configurations in a private channel first
 
-# List all active filters
-/keyword list
-
-# Test a message against filters
-/keyword test "check out http://spam.com"
-```
-
-### Configuring Reaction Forwarding
-```
-# Enable in a channel
-/reaction enable #announcements
-
-# Configure settings
-/reaction settings
-  Category: #general
-  Forward Emoji: ➡️
-  Notification Channel: #notifications
-```
-
-### Setting Up Pinger
-```
-# Configure notification channel
-/pinger channel set #mod-notifications
-
-# Enable monitoring
-/pinger monitor everyone enable
-/pinger monitor here enable
-
-# Add whitelisted role
-/pinger whitelist add @Moderator
-```
-
-## Best Practices
-
-1. **Permission Management**
-   - Regularly review role permissions
-   - Use specific roles for specific features
-   - Don't give unnecessary permissions
-
-2. **Command Usage**
-   - Test commands in a private channel first
-   - Use help command for guidance
-   - Check command feedback
-
-3. **Monitoring**
-   - Keep track of enabled features
-   - Review notification settings
-   - Monitor command usage
-
-## Troubleshooting
-
-If a command fails:
-1. Check your permissions
-2. Verify bot permissions
-3. Check command syntax
-4. Look for error messages
-5. Check the logs
-
-## Support
-
-For command-related issues:
-1. Use `/help [command]`
-2. Check this documentation
-3. Contact server administrators
-4. Report bugs through proper channels 
+4. **Error Handling**:
+   - Commands will provide feedback if something goes wrong
+   - Check permissions if a command doesn't work
+   - Use the help command if unsure about usage
+   - Contact administrators for persistent issues 

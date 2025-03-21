@@ -1,8 +1,24 @@
 """
-Module Loader (Legacy)
+Module Loader
 
-This module handles the dynamic loading of bot modules.
-It is being phased out in favor of a cog-based architecture.
+This module handles the dynamic loading and management of bot modules.
+While being phased out in favor of a cog-based architecture,
+it remains critical for legacy module support.
+
+The Module Loader is responsible for:
+1. Discovering and loading modules dynamically
+2. Managing module lifecycle (setup/teardown)
+3. Handling module dependencies and configuration
+4. Preventing command registration conflicts
+
+Critical:
+- Modules must follow the standard interface (setup/teardown)
+- Configuration must be loaded before module initialization
+- Module dependencies must be properly resolved
+- Command registration must avoid duplicates
+
+Classes:
+    ModuleLoader: Main class for managing bot modules
 """
 
 import os
@@ -16,44 +32,77 @@ logger = logging.getLogger('discord_bot.module_loader')
 
 class ModuleLoader:
     """
-    Handles the discovery and loading of bot modules.
+    Manages the dynamic loading and lifecycle of bot modules.
     
-    NOTE: This class is being phased out in favor of a cog-based architecture.
-    New modules should be implemented as cogs and loaded via bot.load_extension.
+    This class handles:
+    - Module discovery and initialization
+    - Configuration management and validation
+    - Command registration and deregistration
+    - Module lifecycle events (setup/teardown)
+    
+    While being phased out for cogs, it remains essential for:
+    - Legacy module support
+    - Complex module interactions
+    - Custom module behaviors
+    - Dynamic module loading
+    
+    Attributes:
+        loaded_modules (dict): Maps module names to their instances
+        registered_commands (set): Tracks registered command names
+        
+    Critical:
+        - Modules must implement setup/teardown methods
+        - Configuration must be valid before loading
+        - Dependencies must be available
+        - Command names must be unique
     """
     
     def __init__(self):
         """
-        Initialize the module loader.
+        Initialize the module loader system.
+        
+        Sets up:
+        - Module tracking collections
+        - Command registration tracking
+        - Configuration management
+        
+        Note:
+            This class is deprecated and will be replaced by cogs
+            in future versions.
         """
         self.loaded_modules = {}
-        self.registered_commands = set()  # Track registered command names
+        self.registered_commands = set()
         logger.warning("ModuleLoader is deprecated and will be removed in future versions. Use cogs instead.")
     
     def discover_modules(self):
         """
         Discover available modules in the modules directory.
         
+        This method:
+        1. Checks the modules directory
+        2. Identifies valid module structures
+        3. Filters based on enabled modules
+        4. Validates module requirements
+        
         Returns:
-            list: List of module names
+            list: Names of discovered and enabled modules
+            
+        Note:
+            Modules must have a module.py file and be listed
+            in ENABLED_MODULES to be discovered.
         """
         modules = []
         
-        # Get the modules directory
         modules_dir = settings.MODULES_PATH
         
-        # Check if the directory exists
         if not os.path.isdir(modules_dir):
             logger.error(f"Modules directory '{modules_dir}' not found")
             return modules
         
-        # Get all subdirectories in the modules directory
         for item in os.listdir(modules_dir):
             item_path = os.path.join(modules_dir, item)
             
-            # Check if it's a directory and has a module.py file
             if os.path.isdir(item_path) and os.path.isfile(os.path.join(item_path, 'module.py')):
-                # Check if the module is enabled
                 if item in settings.ENABLED_MODULES:
                     modules.append(item)
                     logger.debug(f"Discovered module: {item}")
@@ -64,101 +113,55 @@ class ModuleLoader:
     
     def load_module(self, bot, module_name):
         """
-        Load a module and register its commands with the bot.
+        Load a module and register its commands.
+        
+        This method:
+        1. Imports the module package
+        2. Validates module structure
+        3. Handles configuration setup
+        4. Executes module setup
+        5. Tracks command registration
         
         Args:
-            bot: The Discord bot instance
-            module_name (str): The name of the module to load
-        
+            bot (discord.Client): The Discord bot instance
+            module_name (str): Name of the module to load
+            
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if module loaded successfully
+            
+        Note:
+            Special handling exists for certain modules (e.g. redeye)
+            that require specific configuration setup.
         """
         try:
-            # Import the module
             module_path = f"{settings.MODULES_PATH}.{module_name}.module"
             logger.debug(f"Attempting to import module from {module_path}")
             
-            # Pre-check: If the module is redeye, ensure its configuration exists
+            # Handle special module configurations
             if module_name == 'redeye':
-                try:
-                    # Try to import the config
-                    import importlib
-                    try:
-                        config_module = importlib.import_module(f"config.{module_name}_config")
-                        logger.debug(f"Successfully imported {module_name}_config module")
-                    except ImportError as e:
-                        logger.error(f"Could not import {module_name}_config, will create a minimal version: {e}")
-                        
-                        # Create a minimal config module dynamically if it doesn't exist
-                        # Define minimal default config
-                        DEFAULT_CONFIG = {
-                            "ENABLED": False,
-                            "WAITLISTS": {},
-                            "ROLE_REQUIREMENTS": {},
-                            "NOTIFICATION_CHANNEL_ID": None,
-                            "STATUS_EMOJIS": {
-                                "WAITING": "⏳",
-                                "APPROVED": "✅",
-                                "DENIED": "❌",
-                                "EXPIRED": "⌛"
-                            }
-                        }
-                        
-                        # Create the settings manager
-                        settings_manager = get_manager(module_name, DEFAULT_CONFIG)
-                        
-                        # Create a temporary module
-                        import sys
-                        import types
-                        config_module = types.ModuleType(f'config.{module_name}_config')
-                        config_module.settings_manager = settings_manager
-                        sys.modules[f'config.{module_name}_config'] = config_module
-                        logger.info(f"Created minimal {module_name}_config module")
-                        
-                except Exception as e:
-                    logger.error(f"Error setting up configuration for {module_name}: {e}")
-                    import traceback
-                    logger.error(f"Traceback: {traceback.format_exc()}")
+                if not self._setup_redeye_config(module_name):
                     return False
             
+            # Import and validate module
             try:
                 module = importlib.import_module(module_path)
                 logger.debug(f"Successfully imported module: {module_name}")
             except ImportError as e:
-                logger.error(f"Import error loading module {module_name}: {str(e)}")
-                # Try to diagnose what part of the import failed
-                try:
-                    parent_module = importlib.import_module(settings.MODULES_PATH)
-                    logger.debug(f"Parent module exists: {parent_module}")
-                    
-                    try:
-                        submodule = importlib.import_module(f"{settings.MODULES_PATH}.{module_name}")
-                        logger.debug(f"Submodule exists: {submodule}")
-                        
-                        # The issue might be with the module.py file itself
-                        logger.error(f"Module {module_name} was found but module.py could not be imported")
-                    except ImportError:
-                        logger.error(f"Submodule {module_name} does not exist or could not be imported")
-                except ImportError:
-                    logger.error(f"Parent module {settings.MODULES_PATH} does not exist or could not be imported")
+                self._diagnose_import_failure(module_name, e)
                 return False
             
-            # Check if the module has a setup function
+            # Validate and execute setup
             if hasattr(module, 'setup') and inspect.isfunction(module.setup):
                 logger.debug(f"Found setup function in module: {module_name}")
                 
-                # Get existing commands before setup
                 existing_commands = set(cmd.name for cmd in bot.tree.get_commands())
                 
-                # Call the setup function with our registered commands to avoid duplicates
                 try:
                     logger.debug(f"Calling setup function for module: {module_name}")
                     
-                    # Try to pass registered_commands as an argument
                     try:
                         module.setup(bot, registered_commands=self.registered_commands)
                     except TypeError:
-                        # If that fails, call the original setup function
                         module.setup(bot)
                     
                     logger.debug(f"Successfully called setup function for module: {module_name}")
@@ -168,17 +171,13 @@ class ModuleLoader:
                     logger.error(f"Exception traceback: {traceback.format_exc()}")
                     return False
                 
-                # Get new commands after setup
+                # Track new commands
                 new_commands = set(cmd.name for cmd in bot.tree.get_commands()) - existing_commands
-                
-                # Update our registered commands set
                 self.registered_commands.update(new_commands)
                 
                 logger.info(f"Loaded module: {module_name} with {len(new_commands)} new commands")
                 
-                # Store the loaded module
                 self.loaded_modules[module_name] = module
-                
                 return True
             else:
                 logger.error(f"Module {module_name} does not have a setup function")
@@ -191,61 +190,129 @@ class ModuleLoader:
     
     def reload_module(self, bot, module_name):
         """
-        Reload a module.
+        Reload an existing module.
+        
+        This method:
+        1. Executes module teardown if available
+        2. Reloads the module package
+        3. Re-initializes the module
+        4. Updates command registration
         
         Args:
-            bot: The Discord bot instance
-            module_name (str): The name of the module to reload
-        
+            bot (discord.Client): The Discord bot instance
+            module_name (str): Name of the module to reload
+            
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if module reloaded successfully
+            
+        Note:
+            This is useful for updating module code without
+            restarting the bot.
         """
         try:
-            # Check if the module is loaded
             if module_name not in self.loaded_modules:
                 logger.warning(f"Module {module_name} is not loaded")
                 return False
             
-            # Get the module
             module = self.loaded_modules[module_name]
             
-            # Check if the module has a teardown function
             if hasattr(module, 'teardown') and inspect.isfunction(module.teardown):
-                # Call the teardown function
-                module.teardown(bot)
+                try:
+                    module.teardown(bot)
+                except Exception as e:
+                    logger.error(f"Error in teardown for module {module_name}: {str(e)}")
+                    return False
             
-            # Get existing commands before reload
-            existing_commands = set(cmd.name for cmd in bot.tree.get_commands())
+            # Remove from loaded modules
+            del self.loaded_modules[module_name]
             
             # Reload the module
-            module_path = f"{settings.MODULES_PATH}.{module_name}.module"
-            reloaded_module = importlib.reload(importlib.import_module(module_path))
-            
-            # Check if the reloaded module has a setup function
-            if hasattr(reloaded_module, 'setup') and inspect.isfunction(reloaded_module.setup):
-                # Call the setup function with our registered commands to avoid duplicates
-                try:
-                    # Try to pass registered_commands as an argument
-                    reloaded_module.setup(bot, registered_commands=self.registered_commands)
-                except TypeError:
-                    # If that fails, call the original setup function
-                    reloaded_module.setup(bot)
-                
-                # Get new commands after reload
-                new_commands = set(cmd.name for cmd in bot.tree.get_commands()) - existing_commands
-                
-                # Update our registered commands set
-                self.registered_commands.update(new_commands)
-                
-                logger.info(f"Reloaded module: {module_name} with {len(new_commands)} new commands")
-                
-                # Update the loaded module
-                self.loaded_modules[module_name] = reloaded_module
-                
-                return True
-            else:
-                logger.error(f"Reloaded module {module_name} does not have a setup function")
-                return False
+            return self.load_module(bot, module_name)
         except Exception as e:
             logger.error(f"Error reloading module {module_name}: {str(e)}")
-            return False 
+            return False
+    
+    def _setup_redeye_config(self, module_name):
+        """
+        Set up configuration for the redeye module.
+        
+        This method:
+        1. Attempts to import existing config
+        2. Creates minimal config if needed
+        3. Initializes settings manager
+        
+        Args:
+            module_name (str): Name of the module (should be 'redeye')
+            
+        Returns:
+            bool: True if configuration setup successful
+            
+        Note:
+            This is a private helper method for handling
+            redeye module's special configuration needs.
+        """
+        try:
+            try:
+                config_module = importlib.import_module(f"config.{module_name}_config")
+                logger.debug(f"Successfully imported {module_name}_config module")
+            except ImportError as e:
+                logger.error(f"Could not import {module_name}_config, will create a minimal version: {e}")
+                
+                DEFAULT_CONFIG = {
+                    "ENABLED": False,
+                    "WAITLISTS": {},
+                    "ROLE_REQUIREMENTS": {},
+                    "NOTIFICATION_CHANNEL_ID": None,
+                    "STATUS_EMOJIS": {
+                        "WAITING": "⏳",
+                        "APPROVED": "✅",
+                        "DENIED": "❌",
+                        "EXPIRED": "⌛"
+                    }
+                }
+                
+                settings_manager = get_manager(module_name, DEFAULT_CONFIG)
+                
+                import sys
+                import types
+                config_module = types.ModuleType(f'config.{module_name}_config')
+                config_module.settings_manager = settings_manager
+                sys.modules[f'config.{module_name}_config'] = config_module
+                logger.info(f"Created minimal {module_name}_config module")
+                
+            return True
+        except Exception as e:
+            logger.error(f"Error setting up configuration for {module_name}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
+    
+    def _diagnose_import_failure(self, module_name, error):
+        """
+        Diagnose module import failures.
+        
+        This method:
+        1. Checks parent module existence
+        2. Verifies submodule structure
+        3. Validates module.py presence
+        
+        Args:
+            module_name (str): Name of the failed module
+            error (Exception): The import error
+            
+        Note:
+            This is a private helper method for providing
+            detailed import failure diagnostics.
+        """
+        try:
+            parent_module = importlib.import_module(settings.MODULES_PATH)
+            logger.debug(f"Parent module exists: {parent_module}")
+            
+            try:
+                submodule = importlib.import_module(f"{settings.MODULES_PATH}.{module_name}")
+                logger.debug(f"Submodule exists: {submodule}")
+                logger.error(f"Module {module_name} was found but module.py could not be imported")
+            except ImportError:
+                logger.error(f"Submodule {module_name} does not exist or could not be imported")
+        except ImportError:
+            logger.error(f"Parent module {settings.MODULES_PATH} does not exist or could not be imported") 

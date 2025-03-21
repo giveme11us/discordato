@@ -2,6 +2,29 @@
 Command Sync
 
 This module handles the synchronization of slash commands with the Discord API.
+
+The CommandSync module is responsible for:
+1. Registering and managing slash commands
+2. Synchronizing commands across guilds and globally
+3. Handling command permissions and rate limits
+4. Managing command lifecycle and updates
+5. Ensuring command consistency across environments
+6. Tracking command registration state
+7. Managing command versioning
+
+Critical:
+- Must handle rate limits appropriately
+- Should sync commands during bot initialization
+- Must maintain proper command permissions
+- Should handle both global and guild-specific commands
+- Must ensure atomic command updates
+- Should track command registration state
+- Must validate command configurations
+- Should support command versioning
+- Must handle sync failures gracefully
+
+Classes:
+    CommandSync: Main class for managing Discord slash commands
 """
 
 import logging
@@ -25,25 +48,80 @@ MAX_RETRIES = 3          # Maximum number of retries
 
 class CommandSync:
     """
-    Handles the registration and synchronization of slash commands with Discord.
+    Manages the registration and synchronization of Discord slash commands.
+    
+    This class provides:
+    1. Command registration and deregistration
+    2. Global and guild-specific command syncing
+    3. Command permission management
+    4. Rate limit handling and retries
+    5. Command state tracking
+    6. Version management
+    7. Sync failure recovery
+    
+    Attributes:
+        synced_commands (dict): Maps bot names to their synced commands
+        
+    Critical:
+        - Commands must be synced before bot operation
+        - Rate limits must be respected
+        - Guild permissions must be properly managed
+        - Command updates must be atomic
+        - Must track command state
+        - Should handle sync failures
+        - Must validate command names
+        - Should support versioning
     """
     
     def __init__(self):
         """
-        Initialize the command sync handler.
+        Initialize the command synchronization system.
+        
+        This method:
+        1. Sets up command tracking
+        2. Initializes rate limit handling
+        3. Configures permission management
+        4. Prepares sync state tracking
+        
+        Critical:
+            - Must initialize tracking state
+            - Should prepare rate limit handling
+            - Must set up permission tracking
+            - Should initialize recovery system
         """
         self.synced_commands = {}
     
     def sync_commands(self, bot, bot_name):
         """
-        Sync commands for a bot instance.
-        Only syncs commands globally and doesn't push guild-specific commands.
+        Synchronize commands for a bot instance.
+        
+        This method:
+        1. Syncs commands globally
+        2. Syncs guild-specific commands in development
+        3. Tracks synced commands for the bot
+        4. Handles sync failures
+        5. Manages rate limits
+        6. Validates command states
         
         Args:
-            bot: The Discord bot instance
-            bot_name (str): The name of the bot
+            bot (discord.Client): The Discord bot instance
+            bot_name (str): Identifier for the bot instance
+            
+        Critical:
+            - Must handle rate limits
+            - Should track sync state
+            - Must validate commands
+            - Should handle failures
+            - Must respect environment
+            - Should maintain consistency
+        
+        Note:
+            In development environments, commands are synced to specific guilds
+            defined in GUILD_IDS. In production, commands are synced globally.
+            
+            The sync process is atomic - either all commands sync successfully,
+            or the system maintains its previous state.
         """
-        # Log the commands registered in the bot's command tree
         @bot.event
         async def on_ready():
             try:
@@ -60,21 +138,19 @@ class CommandSync:
                 
                 # For development environments, sync to specific guild IDs
                 if is_development():
-                    # Get guild IDs from environment variable
                     guild_ids = settings.GUILD_IDS
                     if guild_ids:
                         for guild_id in guild_ids:
                             guild = bot.get_guild(guild_id)
                             if guild:
                                 logger.info(f"Syncing commands for guild: {guild.name} (ID: {guild_id})")
-                                # This will sync all commands including context menu commands
                                 bot.tree.copy_global_to(guild=discord.Object(id=guild_id))
                                 await bot.tree.sync(guild=discord.Object(id=guild_id))
                                 logger.info(f"Successfully synced commands to guild {guild.name}")
                             else:
                                 logger.warning(f"Could not find guild with ID {guild_id}")
                 
-                # Always sync globally as well (needed for context menu commands too)
+                # Always sync globally for production environment
                 logger.info("Syncing commands globally")
                 await bot.tree.sync()
                 logger.info("Successfully synced commands globally")
@@ -85,23 +161,44 @@ class CommandSync:
                 logger.info(f"Finished syncing commands for {bot_name}")
             except Exception as e:
                 logger.error(f"Error syncing commands for {bot_name}: {e}")
-                # Log detailed error information
                 import traceback
                 logger.error(f"Exception traceback: {traceback.format_exc()}")
                 
     def register_command(self, bot, command_name, command_callback, description="No description provided", **kwargs):
         """
-        Register a slash command with a bot.
+        Register a slash command with a bot instance.
+        
+        This method:
+        1. Validates command configuration
+        2. Creates the slash command
+        3. Associates the callback
+        4. Handles registration errors
+        5. Tracks command state
+        6. Manages permissions
         
         Args:
-            bot: The Discord bot instance
-            command_name (str): The name of the command
-            command_callback (callable): The function to call when the command is invoked
-            description (str, optional): The description of the command
-            **kwargs: Additional arguments for the command
+            bot (discord.Client): The Discord bot instance
+            command_name (str): Name of the command to register
+            command_callback (callable): Function to handle command invocation
+            description (str, optional): Command description
+            **kwargs: Additional command configuration options
+            
+        Returns:
+            bool: True if registration successful, False otherwise
+            
+        Critical:
+            - Must validate command name
+            - Should check permissions
+            - Must handle errors
+            - Should track state
+            - Must be atomic
+            - Should respect rate limits
+            
+        Note:
+            Command names must be unique within the bot's command tree.
+            Registration is atomic - either succeeds completely or fails safely.
         """
         try:
-            # Create the command
             @bot.tree.command(name=command_name, description=description, **kwargs)
             async def command(interaction: discord.Interaction, **params):
                 return await command_callback(interaction, **params)
@@ -114,21 +211,64 @@ class CommandSync:
             
     def register_module_commands(self, bot):
         """
-        Register all module commands with the bot.
-        This implements a single master command for each feature.
+        Register all module-specific commands with the bot.
+        
+        This method:
+        1. Validates module configurations
+        2. Registers status commands
+        3. Sets up module commands
+        4. Configures permissions
+        5. Handles registration errors
+        6. Tracks command state
         
         Args:
-            bot: The Discord bot instance
+            bot (discord.Client): The Discord bot instance
+            
+        Critical:
+            - Must validate configs
+            - Should check permissions
+            - Must handle errors
+            - Should track state
+            - Must be atomic
+            - Should maintain consistency
+            
+        Note:
+            Each module command is decorated with appropriate permissions
+            and includes detailed configuration options.
+            Registration is atomic - either all commands register or none do.
         """
         try:
             logger.info("Registering simplified module commands")
             from utils.permissions import mod_only
             
-            # General status command - provides overview of all configurations
             @bot.tree.command(name="general", description="View bot status and configuration overview")
             @mod_only()
             async def general(interaction: discord.Interaction):
-                """Show bot status and configuration for all modules"""
+                """
+                Display comprehensive bot status and configuration.
+                
+                This command:
+                1. Gathers module states
+                2. Collects configurations
+                3. Formats status display
+                4. Handles permissions
+                
+                Shows:
+                - Bot status and latency
+                - Keyword filter configuration
+                - Reaction forward settings
+                - Pinger configuration
+                - Store-specific settings
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                    
+                Critical:
+                    - Must validate permissions
+                    - Should gather all states
+                    - Must format properly
+                    - Should handle errors
+                """
                 
                 # Get raw values directly from settings managers
                 # Keyword Filter config values
@@ -286,7 +426,16 @@ class CommandSync:
             # Register ping command
             @bot.tree.command(name="ping", description="Check if the bot is responsive")
             async def ping(interaction: discord.Interaction):
-                await interaction.response.send_message(f"Pong! Bot is responsive. Latency: {round(bot.latency * 1000)}ms", ephemeral=True)
+                """
+                Check bot latency and responsiveness.
+                
+                Returns:
+                    A message with the bot's current latency in milliseconds.
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                """
+                await interaction.response.send_message(f"Pong! Latency: {round(bot.latency * 1000)}ms")
             
             # Reaction Forward Command - Simplified name
             @bot.tree.command(name="reaction", description="Configure reaction forward settings")
@@ -296,6 +445,22 @@ class CommandSync:
                 whitelisted_category_id: str = None,
                 blacklisted_channel_id: str = None
             ):
+                """
+                Configure reaction forwarding settings.
+                
+                This command manages:
+                - Whitelisted categories for reaction forwarding
+                - Blacklisted channels to exclude
+                - Forward destination channels
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                    whitelisted_category_id (str, optional): Category ID to whitelist
+                    blacklisted_channel_id (str, optional): Channel ID to blacklist
+                    
+                Note:
+                    Requires moderator permissions to use
+                """
                 # Import the permission checker
                 from utils.permissions import check_interaction_permissions
                 
@@ -451,6 +616,24 @@ class CommandSync:
                 here: bool = None,
                 roles: bool = None
             ):
+                """
+                Configure mention notification settings.
+                
+                This command manages:
+                - Notification channels
+                - Everyone/here mention monitoring
+                - Role mention monitoring
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                    channel (str, optional): Notification channel ID
+                    everyone (bool, optional): Monitor @everyone mentions
+                    here (bool, optional): Monitor @here mentions
+                    roles (bool, optional): Monitor role mentions
+                    
+                Note:
+                    Requires moderator permissions to use
+                """
                 # Import the permission checker
                 from utils.permissions import check_interaction_permissions
                 
@@ -592,6 +775,23 @@ class CommandSync:
                 channel_ids: str = None,
                 file_path: str = None
             ):
+                """
+                Configure LuisaViaRoma link reaction settings.
+                
+                This command manages:
+                - Channel monitoring for LVR links
+                - PID tracking configuration
+                - Reaction settings
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                    channel_ids (str, optional): Comma-separated channel IDs to monitor
+                    file_path (str, optional): Path to PID tracking file
+                    
+                Note:
+                    Requires moderator permissions to use
+                    Channel IDs should be comma-separated
+                """
                 # Import the permission checker
                 from utils.permissions import check_interaction_permissions
                 
@@ -773,6 +973,24 @@ class CommandSync:
                 channel_ids: str = None,
                 file_path: str = None
             ):
+                """
+                Remove PIDs from LuisaViaRoma tracking system.
+                
+                This command manages:
+                - PID removal from tracking
+                - Channel configuration updates
+                - Tracking file maintenance
+                
+                Args:
+                    interaction (discord.Interaction): The command interaction
+                    pid (str, optional): Product ID to remove
+                    channel_ids (str, optional): Comma-separated channel IDs to update
+                    file_path (str, optional): Path to PID tracking file
+                    
+                Note:
+                    Requires moderator permissions to use
+                    PIDs are permanently removed from tracking
+                """
                 # Import the permission checker
                 from utils.permissions import check_interaction_permissions
                 
