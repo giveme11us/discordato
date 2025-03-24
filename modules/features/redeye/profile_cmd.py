@@ -21,6 +21,7 @@ from config.features.redeye_config import redeye as redeye_config
 from config.features.embed_config import embed as embed_config
 from typing import Optional, List, Set
 from discord.ext import commands
+from .account_gen import generate_accounts, create_accounts_file  # Import account generation functions
 
 # Set up debug logging
 logger = logging.getLogger('discord_bot.modules.redeye.profile_cmd')
@@ -215,22 +216,25 @@ class ProfileModal(discord.ui.Modal, title='Add Profile'):
 
             # Write to CSV
             file_exists = os.path.exists(redeye_config.PROFILES_PATH)
-            
-            # If file doesn't exist, create it with headers in the correct order
             fieldnames = ['Name', 'Webhook', 'SizeLowerBound', 'SizeUpperBound', 'Multiplier', 'Email', 'Password', 'IsPaypal']
             
             if not file_exists:
+                # Create new file with headers
                 with open(redeye_config.PROFILES_PATH, 'w', newline='') as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
-            
-            # Append the new profile with a newline
-            with open(redeye_config.PROFILES_PATH, 'a', newline='') as f:
-                # Add a newline if file exists and doesn't end with one
-                if file_exists:
-                    f.write('\n')
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writerow(profile_data)
+                    writer.writerow(profile_data)
+            else:
+                # Read existing content to check if we need a newline
+                with open(redeye_config.PROFILES_PATH, 'r') as f:
+                    content = f.read()
+                
+                # Append to file, adding newline only if the file doesn't end with one
+                with open(redeye_config.PROFILES_PATH, 'a', newline='') as f:
+                    if content and not content.endswith('\n'):
+                        f.write('\n')
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writerow(profile_data)
 
             embed = discord.Embed(title="✅ Profile Added Successfully")
             embed = apply_embed_settings(embed)
@@ -484,6 +488,72 @@ async def setup_profile_cmd(bot, registered_commands=None):
                 ephemeral=True
             )
     
+    @redeye.command(name="account-gen")
+    @app_commands.describe(
+        storename="The name of the store to generate accounts for (e.g. luisaviaroma)",
+        catchall="The catchall domain for email generation (e.g. @example.com)",
+        quantity="The number of accounts to generate (1-50)"
+    )
+    @has_redeye_permission()
+    async def account_gen(
+        interaction: discord.Interaction,
+        storename: str,
+        catchall: str,
+        quantity: app_commands.Range[int, 1, 50]
+    ):
+        """Generate accounts for a specific store."""
+        try:
+            # Validate catchall format
+            if not catchall.startswith("@"):
+                await interaction.response.send_message(
+                    "❌ Catchall must start with @ (e.g. @example.com)",
+                    ephemeral=True
+                )
+                return
+
+            # Send initial response
+            await interaction.response.defer(ephemeral=True)
+            
+            # Generate accounts
+            accounts = await generate_accounts(storename, catchall, quantity)
+            
+            if not accounts:
+                await interaction.followup.send(
+                    f"❌ Failed to generate accounts for {storename}. Please check the store name and try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create accounts file
+            accounts_file = create_accounts_file(accounts)
+            
+            # Send response with file
+            embed = discord.Embed(
+                title="✅ Account Generation Complete",
+                description=f"Successfully generated {len(accounts)} accounts for {storename}",
+                color=discord.Color.green()
+            )
+            embed = apply_embed_settings(embed)
+            
+            await interaction.followup.send(
+                embed=embed,
+                file=accounts_file,
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in account generation: {e}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ An error occurred while generating accounts.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ An error occurred while generating accounts.",
+                    ephemeral=True
+                )
+    
     # Add error handlers for the commands
     @view_profiles.error
     async def view_profiles_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -498,6 +568,11 @@ async def setup_profile_cmd(bot, registered_commands=None):
     
     @remove_profile_cmd.error
     async def remove_profile_cmd_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if not await handle_permission_error(interaction, error):
+            raise error
+    
+    @account_gen.error
+    async def account_gen_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
         if not await handle_permission_error(interaction, error):
             raise error
     

@@ -1,0 +1,20 @@
+curl --location 'https://www.luisaviaroma.com/myarea/usersession/registeruser' \
+--header 'accept: */*' \
+--header 'accept-language: it-IT,it;q=0.9' \
+--header 'cache-control: no-cache' \
+--header 'content-length: 248' \
+--header 'content-type: application/json' \
+--header 'origin: https://www.luisaviaroma.com' \
+--header 'pragma: no-cache' \
+--header 'priority: u=1, i' \
+--header 'referer: https://www.luisaviaroma.com/myarea/login' \
+--header 'sec-ch-ua: "Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"' \
+--header 'sec-ch-ua-mobile: ?0' \
+--header 'sec-ch-ua-platform: "macOS"' \
+--header 'sec-fetch-dest: empty' \
+--header 'sec-fetch-mode: cors' \
+--header 'sec-fetch-site: same-origin' \
+--header 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36' \
+--header 'x-requested-with: XMLHttpRequest' \
+--header 'Host: www.luisaviaroma.com' \
+--data-raw '{"Privacy":true,"Newsletter":true,"Loyalty":true,"ProfilingAgree":true,"FirstName":"ivan","LastName":"sposato","UserId":"isfdsfdsfsdf@gmail.com","Password":"Porcodio1!","RePassword":"Porcodio1!","SmsAgree":false,"Language":"IT","Channel":"account"}'
