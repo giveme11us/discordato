@@ -38,3 +38,10 @@
 - Regular backups should be maintained throughout the process
 - Changes should be implemented in small, manageable chunks
 - Each change should be reviewed before implementation 
+
+
+
+
+
+
+modules: online,instore,redeye

@@ -34,6 +34,12 @@ async def process_message(message):
             
         logger.debug(f"Processing message: content='{message.content}', author={message.author}, channel={channel_info}, guild={guild_info}")
         logger.debug(f"Message has mention_everyone={message.mention_everyone}, contains '@here'={'@here' in message.content}, role_mentions={len(message.role_mentions)}")
+        
+        # Log if message has embeds
+        if message.embeds:
+            logger.debug(f"Message has {len(message.embeds)} embeds")
+            for i, embed in enumerate(message.embeds):
+                logger.debug(f"Embed {i+1} title: {embed.title}, description: {embed.description[:50]}...")
     except Exception as e:
         logger.debug(f"Error logging message info: {str(e)}")
     
@@ -51,14 +57,9 @@ async def process_message(message):
     
     logger.debug(f"Using notification channel ID: {notification_channel_id}")
     
-    # Skip messages from bots
-    if message.author.bot:
-        logger.debug(f"Skipping message from bot: {message.author}")
-        return
-    
-    # Skip direct messages
+    # Skip messages not in a guild (DMs or other non-guild contexts)
     if not message.guild:
-        logger.debug("Skipping direct message")
+        logger.debug("Skipping message - not in a guild context")
         return
     
     # Check for monitored mentions
@@ -77,12 +78,16 @@ async def process_message(message):
     # Log whitelist for debugging
     logger.debug(f"Whitelist role IDs: {whitelist_role_ids}")
     
-    # Check each of the user's roles
-    for role in message.author.roles:
-        if role.id in whitelist_role_ids:
-            user_has_whitelisted_role = True
-            logger.debug(f"User {message.author} has whitelisted role {role.name}")
-            break
+    # Check if author is a Member (has roles) and not a User or ClientUser
+    if hasattr(message.author, 'roles'):
+        # Check each of the user's roles
+        for role in message.author.roles:
+            if role.id in whitelist_role_ids:
+                user_has_whitelisted_role = True
+                logger.debug(f"User {message.author} has whitelisted role {role.name}")
+                break
+    else:
+        logger.debug(f"Author {message.author} has no roles attribute, skipping role check")
     
     # Skip if whitelist is enabled and user doesn't have a whitelisted role
     if not user_has_whitelisted_role and whitelist_role_ids:
@@ -160,8 +165,25 @@ def create_ping_notification_embed(message, ping_type):
         title=notification_title,
     )
     
-    # Add channel field only (removing the Role field)
-    embed.add_field(name="Channel:", value=f"<#{message.channel.id}>", inline=False)
+    # Add message content when available
+    if message.content:
+        embed.description = message.content
+    elif message.embeds and message.embeds[0].description:
+        embed.description = message.embeds[0].description
+        if message.embeds[0].title:
+            embed.title = f"{notification_title}: {message.embeds[0].title}"
+    
+    # Add ping type field
+    embed.add_field(name="Ping Type:", value=ping_type, inline=True)
+    
+    # Add channel field
+    embed.add_field(name="Channel:", value=f"<#{message.channel.id}>", inline=True)
+    
+    # Set author information
+    embed.set_author(
+        name=message.author.display_name,
+        icon_url=message.author.display_avatar.url
+    )
     
     # Set timestamp from the message
     embed.timestamp = message.created_at
