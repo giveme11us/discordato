@@ -794,14 +794,14 @@ async def setup(bot):
     @forward_group.command(name="add_channel_rule")
     @app_commands.describe(
         channels="Comma-separated list of channel IDs to monitor",
-        keyword="Keyword to match (use quotes for phrases)",
+        keywords="Comma-separated list of keywords to match (use quotes for phrases)",
         target_channel="Channel ID where matches will be forwarded"
     )
     @require_mod_role()
     async def forward_add_channel_rule(
         interaction: discord.Interaction,
         channels: str,
-        keyword: str,
+        keywords: str,
         target_channel: str
     ):
         """Add a forwarding rule for specific channels."""
@@ -817,6 +817,15 @@ async def setup(bot):
             if not channel_ids:
                 await interaction.response.send_message(
                     "❌ No valid channel IDs provided.",
+                    ephemeral=True
+                )
+                return
+            
+            # Parse keywords
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+            if not keyword_list:
+                await interaction.response.send_message(
+                    "❌ No valid keywords provided.",
                     ephemeral=True
                 )
                 return
@@ -841,7 +850,7 @@ async def setup(bot):
             # Check if the same rule already exists
             for rule in PINGER_CONFIG["forwarding_rules"]:
                 if (rule.get("type") == "channels" and 
-                    rule.get("keyword") == keyword and
+                    set(rule.get("keywords", [])) == set(keyword_list) and
                     set(rule.get("channel_ids", [])) == set(channel_ids) and
                     rule.get("target_channel") == target_id):
                     await interaction.response.send_message(
@@ -853,7 +862,7 @@ async def setup(bot):
             # Create the rule
             rule = {
                 "type": "channels",
-                "keyword": keyword,
+                "keywords": keyword_list,
                 "channel_ids": channel_ids,
                 "target_channel": target_id
             }
@@ -865,8 +874,15 @@ async def setup(bot):
             # Create response embed
             embed = discord.Embed(
                 title="✅ Forwarding Rule Added",
-                description=f"Messages containing `{keyword}` will be forwarded.",
+                description="Messages containing any of these keywords will be forwarded:",
                 color=int(os.getenv('EMBED_COLOR', '000000'), 16)
+            )
+            
+            # Add keywords
+            embed.add_field(
+                name="Keywords",
+                value="\n".join(f"• `{k}`" for k in keyword_list),
+                inline=False
             )
             
             # Add rule details
@@ -892,7 +908,7 @@ async def setup(bot):
     @forward_group.command(name="add_category_rule")
     @app_commands.describe(
         category="Category ID to monitor",
-        keyword="Keyword to match (use quotes for phrases)",
+        keywords="Comma-separated list of keywords to match (use quotes for phrases)",
         target_channel="Channel ID where matches will be forwarded",
         blacklist_channels="Optional: Comma-separated list of channel IDs to exclude",
         blacklist_rooms="Optional: Comma-separated list of room IDs within the category to exclude"
@@ -901,7 +917,7 @@ async def setup(bot):
     async def forward_add_category_rule(
         interaction: discord.Interaction,
         category: str,
-        keyword: str,
+        keywords: str,
         target_channel: str,
         blacklist_channels: Optional[str] = None,
         blacklist_rooms: Optional[str] = None
@@ -921,6 +937,15 @@ async def setup(bot):
             except ValueError:
                 await interaction.response.send_message(
                     "❌ Invalid category ID.",
+                    ephemeral=True
+                )
+                return
+            
+            # Parse keywords
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+            if not keyword_list:
+                await interaction.response.send_message(
+                    "❌ No valid keywords provided.",
                     ephemeral=True
                 )
                 return
@@ -963,7 +988,7 @@ async def setup(bot):
             # Check if the same rule already exists
             for rule in PINGER_CONFIG["forwarding_rules"]:
                 if (rule.get("type") == "category" and 
-                    rule.get("keyword") == keyword and
+                    set(rule.get("keywords", [])) == set(keyword_list) and
                     rule.get("category_id") == category_id and
                     rule.get("target_channel") == target_id and
                     set(rule.get("blacklist_ids", [])) == set(blacklist_ids) and
@@ -977,7 +1002,7 @@ async def setup(bot):
             # Create the rule
             rule = {
                 "type": "category",
-                "keyword": keyword,
+                "keywords": keyword_list,
                 "category_id": category_id,
                 "blacklist_ids": blacklist_ids,
                 "blacklist_room_ids": blacklist_room_ids,
@@ -991,8 +1016,15 @@ async def setup(bot):
             # Create response embed
             embed = discord.Embed(
                 title="✅ Category Forwarding Rule Added",
-                description=f"Messages containing `{keyword}` will be forwarded.",
+                description="Messages containing any of these keywords will be forwarded:",
                 color=int(os.getenv('EMBED_COLOR', '000000'), 16)
+            )
+            
+            # Add keywords
+            embed.add_field(
+                name="Keywords",
+                value="\n".join(f"• `{k}`" for k in keyword_list),
+                inline=False
             )
             
             # Add rule details
@@ -1055,7 +1087,7 @@ async def setup(bot):
                 target = f"<#{rule.get('target_channel')}>"
                 embed.add_field(
                     name=f"Channel Rule #{i+1}",
-                    value=f"Keyword: `{rule.get('keyword')}`\nChannels: {', '.join(channels)}\nTarget: {target}",
+                    value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nChannels: {', '.join(channels)}\nTarget: {target}",
                     inline=False
                 )
         
@@ -1071,7 +1103,7 @@ async def setup(bot):
                     blacklist = f"\nExcluded: {', '.join(blacklist_mentions)}"
                 embed.add_field(
                     name=f"Category Rule #{i+1}",
-                    value=f"Keyword: `{rule.get('keyword')}`\nCategory: {category}{blacklist}\nTarget: {target}",
+                    value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nCategory: {category}{blacklist}\nTarget: {target}",
                     inline=False
                 )
         
@@ -1105,7 +1137,7 @@ async def setup(bot):
         # Create a response embed
         embed = discord.Embed(
             title="✅ Forwarding Rule Removed",
-            description=f"Rule for keyword `{rule.get('keyword')}` has been removed.",
+            description=f"Rule for keywords {', '.join(f"`{k}`" for k in rule.get('keywords', []))} has been removed.",
             color=int(os.getenv('EMBED_COLOR', '000000'), 16)
         )
         
@@ -1427,10 +1459,10 @@ async def process_forwarding_rules(bot, message):
                 continue
                 
             rule_type = rule.get("type")
-            keyword = rule.get("keyword", "")
+            keywords = rule.get("keywords", [])
             
-            # Skip if no keyword
-            if not keyword:
+            # Skip if no keywords
+            if not keywords:
                 continue
                 
             # Check if message is in scope for this rule
@@ -1458,33 +1490,71 @@ async def process_forwarding_rules(bot, message):
             if not in_scope:
                 continue
                 
-            # Check keyword match in message content
+            # Check keyword match in message content and embeds
             keyword_match = False
+            matched_keyword = None
+            matched_content = None
             
             # Check in message content
-            if message.content and keyword.lower() in message.content.lower():
-                keyword_match = True
+            if message.content:
+                for keyword in keywords:
+                    if keyword.lower() in message.content.lower():
+                        keyword_match = True
+                        matched_keyword = keyword
+                        matched_content = message.content
+                        break
                 
             # Check in embeds if no match in content
             if not keyword_match and message.embeds:
                 for embed in message.embeds:
                     # Check embed title
-                    if embed.title and keyword.lower() in embed.title.lower():
-                        keyword_match = True
-                        break
-                        
-                    # Check embed description
-                    if embed.description and keyword.lower() in embed.description.lower():
-                        keyword_match = True
-                        break
-                        
-                    # Check embed fields
-                    for field in embed.fields:
-                        if (field.name and keyword.lower() in field.name.lower()) or \
-                           (field.value and keyword.lower() in field.value.lower()):
-                            keyword_match = True
+                    if embed.title:
+                        for keyword in keywords:
+                            if keyword.lower() in embed.title.lower():
+                                keyword_match = True
+                                matched_keyword = keyword
+                                matched_content = f"**{embed.title}**"
+                                if embed.description:
+                                    matched_content += f"\n{embed.description}"
+                                break
+                        if keyword_match:
                             break
                             
+                    # Check embed description
+                    if not keyword_match and embed.description:
+                        for keyword in keywords:
+                            if keyword.lower() in embed.description.lower():
+                                keyword_match = True
+                                matched_keyword = keyword
+                                if embed.title:
+                                    matched_content = f"**{embed.title}**\n{embed.description}"
+                                else:
+                                    matched_content = embed.description
+                                break
+                        if keyword_match:
+                            break
+                            
+                    # Check embed fields
+                    if not keyword_match:
+                        for field in embed.fields:
+                            for keyword in keywords:
+                                if (field.name and keyword.lower() in field.name.lower()) or \
+                                   (field.value and keyword.lower() in field.value.lower()):
+                                    keyword_match = True
+                                    matched_keyword = keyword
+                                    if embed.title:
+                                        matched_content = f"**{embed.title}**\n"
+                                    else:
+                                        matched_content = ""
+                                        
+                                    if embed.description:
+                                        matched_content += f"{embed.description}\n"
+                                        
+                                    matched_content += f"**{field.name}**: {field.value}"
+                                    break
+                            if keyword_match:
+                                break
+                                
                     if keyword_match:
                         break
             
@@ -1505,7 +1575,7 @@ async def process_forwarding_rules(bot, message):
             # Create forward embed
             embed = discord.Embed(
                 title="Forwarded Message",
-                description=message.content if message.content else "No content",
+                description=matched_content if matched_content else "No content",
                 color=int(os.getenv('EMBED_COLOR', '000000'), 16)
             )
             
@@ -1533,7 +1603,7 @@ async def process_forwarding_rules(bot, message):
             # Add matched keyword
             embed.add_field(
                 name="Matched Keyword",
-                value=f"`{keyword}`",
+                value=f"`{matched_keyword}`",
                 inline=True
             )
             
