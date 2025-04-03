@@ -162,13 +162,14 @@ async def setup(bot):
         if not isinstance(interaction.user, discord.Member):
             return False
             
-        role_id = os.getenv('PINGER_USER_ROLE_ID')
-        if not role_id:
+        role_ids_str = os.getenv('PINGER_USER_ROLE_ID')
+        if not role_ids_str:
             return False
             
         try:
-            role_id = int(role_id)
-            return any(role.id == role_id for role in interaction.user.roles)
+            # Split the comma-separated role IDs and convert each to int
+            role_ids = [int(role_id.strip()) for role_id in role_ids_str.split(',') if role_id.strip()]
+            return any(role.id in role_ids for role in interaction.user.roles)
         except:
             return False
     

@@ -18,7 +18,7 @@ logger = logging.getLogger('discord_bot.mod')
 
 # Configuration
 MOD_WHITELIST_ROLE_IDS = [int(id) for id in os.getenv('MOD_WHITELIST_ROLE_IDS', '').split(',') if id]
-PINGER_USER_ROLE_ID = int(os.getenv('PINGER_USER_ROLE_ID', '0'))
+PINGER_USER_ROLE_IDS = [int(id) for id in os.getenv('PINGER_USER_ROLE_ID', '').split(',') if id]
 
 # Track loaded submodules
 loaded_submodules = set()
@@ -83,7 +83,7 @@ def require_pinger_user_role():
             return False
             
         # Check if user has the pinger user role
-        has_role = any(role.id == PINGER_USER_ROLE_ID for role in interaction.user.roles)
+        has_role = any(role.id in PINGER_USER_ROLE_IDS for role in interaction.user.roles)
         
         if not has_role:
             await interaction.response.send_message(
