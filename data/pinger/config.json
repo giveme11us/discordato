@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "monitor_channel_ids": [],
+  "blacklist_channel_ids": [],
+  "user_keywords": {
+    "323379312608673803": {
+      "keywords": [
+        "ciao"
+      ],
+      "channels": []
+    },
+    "442974248613445632": {
+      "keywords": [
+        "test"
+      ],
+      "channels": []
+    }
+  },
+  "notification_channel_id": null,
+  "forwarding_rules": []
+}

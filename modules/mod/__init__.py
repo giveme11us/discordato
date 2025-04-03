@@ -18,6 +18,7 @@ logger = logging.getLogger('discord_bot.mod')
 
 # Configuration
 MOD_WHITELIST_ROLE_IDS = [int(id) for id in os.getenv('MOD_WHITELIST_ROLE_IDS', '').split(',') if id]
+PINGER_USER_ROLE_ID = int(os.getenv('PINGER_USER_ROLE_ID', '0'))
 
 # Track loaded submodules
 loaded_submodules = set()
@@ -46,9 +47,47 @@ def require_mod_role():
             
         # Check if user has any of the whitelisted roles
         has_role = any(role.id in MOD_WHITELIST_ROLE_IDS for role in interaction.user.roles)
+        
         if not has_role:
             await interaction.response.send_message(
                 "You need moderator permissions to use this command.",
+                ephemeral=True
+            )
+            return False
+            
+        return True
+        
+    return app_commands.check(predicate)
+
+def require_pinger_user_role():
+    """
+    Decorator to check if user has the pinger user role.
+    This allows users to manage their own pinger settings.
+    
+    Returns:
+        function: Decorated function that checks for pinger user role
+    """
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if not interaction.guild:
+            await interaction.response.send_message(
+                "This command can only be used in a server.",
+                ephemeral=True
+            )
+            return False
+            
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                "Could not verify user permissions.",
+                ephemeral=True
+            )
+            return False
+            
+        # Check if user has the pinger user role
+        has_role = any(role.id == PINGER_USER_ROLE_ID for role in interaction.user.roles)
+        
+        if not has_role:
+            await interaction.response.send_message(
+                "You need the pinger user role to use this command.",
                 ephemeral=True
             )
             return False

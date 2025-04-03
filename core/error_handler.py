@@ -302,28 +302,31 @@ class ErrorHandler:
             if isinstance(error, app_commands.CheckFailure):
                 # Check if it's a permission error for redeye module
                 if "doesn't have permission to use Redeye module commands" in str(error):
-                    embed = discord.Embed(
-                        title="Permission Required",
-                        description="You need the appropriate role to use Redeye commands.",
-                        color=discord.Color.red()
-                    )
-                    embed.add_field(
-                        name="How to Get Access",
-                        value="Please contact an administrator to get the required role.",
-                        inline=False
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    if not interaction.response.is_done():
+                        embed = discord.Embed(
+                            title="Permission Required",
+                            description="You need the appropriate role to use Redeye commands.",
+                            color=discord.Color.red()
+                        )
+                        embed.add_field(
+                            name="How to Get Access",
+                            value="Please contact an administrator to get the required role.",
+                            inline=False
+                        )
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
                 else:
-                    await interaction.response.send_message(
-                        f"❌ {str(error)}",
-                        ephemeral=True
-                    )
+                    if not interaction.response.is_done():
+                        await interaction.response.send_message(
+                            f"❌ {str(error)}",
+                            ephemeral=True
+                        )
             else:
                 logger.error(f"Error in command {interaction.command}: {error}", exc_info=error)
-                await interaction.response.send_message(
-                    "❌ An error occurred while executing the command.",
-                    ephemeral=True
-                )
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "❌ An error occurred while executing the command.",
+                        ephemeral=True
+                    )
         
         @bot.event
         async def on_error(event, *args, **kwargs):

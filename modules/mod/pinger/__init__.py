@@ -14,10 +14,11 @@ import logging
 import discord
 from discord import app_commands
 from typing import Optional, Dict, List, Set
-from .. import require_mod_role
+from .. import require_mod_role, require_pinger_user_role
 import io
 import asyncio
 import time
+import random
 
 logger = logging.getLogger('discord_bot.mod.pinger')
 
@@ -185,7 +186,7 @@ async def setup(bot):
         user: discord.Member,
         keywords: str
     ):
-        """Add keywords for a user."""
+        """Add keywords for a user to be notified about."""
         # Initialize user config if needed
         if str(user.id) not in PINGER_CONFIG["user_keywords"]:
             PINGER_CONFIG["user_keywords"][str(user.id)] = {
@@ -267,10 +268,13 @@ async def setup(bot):
     ):
         """List keywords for a user or all users."""
         try:
+            # Defer the response immediately to prevent timeout
+            await interaction.response.defer(ephemeral=True)
+            
             if user:
                 # List keywords for specific user
                 if str(user.id) not in PINGER_CONFIG["user_keywords"]:
-                    await interaction.response.send_message(
+                    await interaction.followup.send(
                         f"No keywords found for {user.mention}",
                         ephemeral=True
                     )
@@ -299,12 +303,12 @@ async def setup(bot):
                         inline=False
                     )
                     
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=True)
                 
             else:
                 # List all users
                 if not PINGER_CONFIG["user_keywords"]:
-                    await interaction.response.send_message(
+                    await interaction.followup.send(
                         "No keywords configured for any users.",
                         ephemeral=True
                     )
@@ -328,23 +332,15 @@ async def setup(bot):
                         logger.debug(f"Error fetching member {user_id}: {e}")
                         continue
                     
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             logger.error(f"Error in pinger_list command: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "An error occurred while listing keywords.",
-                    ephemeral=True
-                )
-            else:
-                try:
-                    await interaction.followup.send(
-                        "An error occurred while listing keywords.",
-                        ephemeral=True
-                    )
-                except:
-                    pass
-            
+            # Use followup since we already deferred
+            await interaction.followup.send(
+                "An error occurred while listing keywords.",
+                ephemeral=True
+            )
+    
     @pinger_group.command(name="channel")
     @app_commands.describe(
         action="Whether to add or remove a channel",
@@ -510,7 +506,7 @@ async def setup(bot):
         return False
     
     @keywords_group.command(name="list")
-    @keyword_access()
+    @require_pinger_user_role()
     async def keywords_list(interaction: discord.Interaction):
         """List your personal notification keywords."""
         try:
@@ -556,10 +552,10 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while listing your keywords.", ephemeral=True)
     
     @keywords_group.command(name="add")
-    @keyword_access()
+    @require_pinger_user_role()
     @app_commands.describe(keywords="Comma-separated list of keywords to add")
     async def keywords_add(interaction: discord.Interaction, keywords: str):
-        """Add keywords to your notification list."""
+        """Add keywords to your personal notification list."""
         try:
             user_id = str(interaction.user.id)
             
@@ -596,10 +592,10 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while adding your keywords.", ephemeral=True)
     
     @keywords_group.command(name="remove")
-    @keyword_access()
+    @require_pinger_user_role()
     @app_commands.describe(keywords="Comma-separated list of keywords to remove")
     async def keywords_remove(interaction: discord.Interaction, keywords: str):
-        """Remove keywords from your notification list."""
+        """Remove keywords from your personal notification list."""
         try:
             user_id = str(interaction.user.id)
             
@@ -636,9 +632,9 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while removing your keywords.", ephemeral=True)
     
     @keywords_group.command(name="channels")
-    @keyword_access()
-    async def keywords_channels(interaction: discord.Interaction):
-        """List channels where your keywords are active."""
+    @require_pinger_user_role()
+    async def keywords_channels(interaction: discord.Interaction, channels: str):
+        """Set channel whitelist for your keywords."""
         try:
             user_id = str(interaction.user.id)
             
@@ -677,7 +673,7 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while listing your channel settings.", ephemeral=True)
                     
     @keywords_group.command(name="add_channel")
-    @keyword_access()
+    @require_pinger_user_role()
     @app_commands.describe(channel="The channel to add to your whitelist")
     async def keywords_add_channel(interaction: discord.Interaction, channel: discord.TextChannel):
         """Add a channel to your keyword whitelist."""
@@ -713,7 +709,7 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while adding the channel.", ephemeral=True)
                     
     @keywords_group.command(name="remove_channel")
-    @keyword_access()
+    @require_pinger_user_role()
     @app_commands.describe(channel="The channel to remove from your whitelist")
     async def keywords_remove_channel(interaction: discord.Interaction, channel: discord.TextChannel):
         """Remove a channel from your keyword whitelist."""
@@ -749,7 +745,7 @@ async def setup(bot):
             await safe_respond(interaction, "An error occurred while removing the channel.", ephemeral=True)
                     
     @keywords_group.command(name="clear_channels")
-    @keyword_access()
+    @require_pinger_user_role()
     async def keywords_clear_channels(interaction: discord.Interaction):
         """Clear your channel whitelist to listen in all channels."""
         try:
@@ -897,7 +893,8 @@ async def setup(bot):
         category="Category ID to monitor",
         keyword="Keyword to match (use quotes for phrases)",
         target_channel="Channel ID where matches will be forwarded",
-        blacklist_channels="Optional: Comma-separated list of channel IDs to exclude"
+        blacklist_channels="Optional: Comma-separated list of channel IDs to exclude",
+        blacklist_rooms="Optional: Comma-separated list of room IDs within the category to exclude"
     )
     @require_mod_role()
     async def forward_add_category_rule(
@@ -905,9 +902,10 @@ async def setup(bot):
         category: str,
         keyword: str,
         target_channel: str,
-        blacklist_channels: Optional[str] = None
+        blacklist_channels: Optional[str] = None,
+        blacklist_rooms: Optional[str] = None
     ):
-        """Add a forwarding rule for an entire category with optional blacklisted channels."""
+        """Add a forwarding rule for an entire category with optional blacklisted channels and rooms."""
         try:
             # Parse category ID
             try:
@@ -934,6 +932,15 @@ async def setup(bot):
                         blacklist_ids.append(int(channel_id.strip()))
                     except ValueError:
                         continue
+                        
+            # Parse blacklisted rooms
+            blacklist_room_ids = []
+            if blacklist_rooms:
+                for room_id in blacklist_rooms.split(','):
+                    try:
+                        blacklist_room_ids.append(int(room_id.strip()))
+                    except ValueError:
+                        continue
             
             # Validate target channel
             try:
@@ -958,7 +965,8 @@ async def setup(bot):
                     rule.get("keyword") == keyword and
                     rule.get("category_id") == category_id and
                     rule.get("target_channel") == target_id and
-                    set(rule.get("blacklist_ids", [])) == set(blacklist_ids)):
+                    set(rule.get("blacklist_ids", [])) == set(blacklist_ids) and
+                    set(rule.get("blacklist_room_ids", [])) == set(blacklist_room_ids)):
                     await interaction.response.send_message(
                         "❌ This rule already exists.",
                         ephemeral=True
@@ -971,6 +979,7 @@ async def setup(bot):
                 "keyword": keyword,
                 "category_id": category_id,
                 "blacklist_ids": blacklist_ids,
+                "blacklist_room_ids": blacklist_room_ids,
                 "target_channel": target_id
             }
             
@@ -997,6 +1006,14 @@ async def setup(bot):
                 embed.add_field(
                     name="Excluded Channels",
                     value=", ".join(blacklist_mentions),
+                    inline=False
+                )
+                
+            if blacklist_room_ids:
+                room_mentions = [f"<#{r_id}>" for r_id in blacklist_room_ids]
+                embed.add_field(
+                    name="Excluded Rooms",
+                    value=", ".join(room_mentions),
                     inline=False
                 )
             
@@ -1375,39 +1392,26 @@ async def teardown(bot):
     logger.info("Saved pinger configuration")
 
 async def process_forwarding_rules(bot, message):
-    """
-    Process forwarding rules for a message.
-    
-    Args:
-        bot: The Discord bot instance
-        message: The Discord message to process
-    """
+    """Process forwarding rules for a message."""
     try:
-        # Skip messages without content or embeds
-        if not message.content and not message.embeds:
+        # Skip if no rules configured
+        if not PINGER_CONFIG.get("forwarding_rules"):
             return
             
-        # Skip if no guild
-        if not message.guild:
-            return
-            
-        # Initialize message tracking if needed
+        # Get message ID for tracking
         message_id_str = str(message.id)
+        
+        # Initialize tracking for this message if not already done
         if message_id_str not in processed_messages:
             processed_messages[message_id_str] = {
                 "timestamp": time.time(),
-                "users": [],
-                "rules": [],
-                "retry_count": 0
+                "rules": set(),
+                "forwards": 0
             }
             
-        # Get matched content from message or embeds
-        matched_content = message.content
-        
-        # Track processed rules to avoid duplicate forwards
-        processed_forwards = 0
-        max_forwards_per_message = 3  # Limit number of forwards for the same message
-        current_time = time.time()
+        # Track number of forwards for this message
+        processed_forwards = processed_messages[message_id_str].get("forwards", 0)
+        max_forwards_per_message = 5  # Limit to prevent spam
         
         # Check each rule
         for rule_index, rule in enumerate(PINGER_CONFIG["forwarding_rules"]):
@@ -1441,8 +1445,12 @@ async def process_forwarding_rules(bot, message):
                 # Check if message is in the rule's category
                 category_id = rule.get("category_id")
                 blacklist_ids = rule.get("blacklist_ids", [])
+                blacklist_room_ids = rule.get("blacklist_room_ids", [])
                 
-                if message.channel.category and message.channel.category.id == category_id and message.channel.id not in blacklist_ids:
+                if (message.channel.category and 
+                    message.channel.category.id == category_id and 
+                    message.channel.id not in blacklist_ids and
+                    message.channel.id not in blacklist_room_ids):
                     in_scope = True
             
             # Skip if not in scope
@@ -1451,196 +1459,97 @@ async def process_forwarding_rules(bot, message):
                 
             # Check keyword match in message content
             keyword_match = False
-            if message.content and re.search(rf"\b{re.escape(keyword)}\b", message.content, re.IGNORECASE):
+            
+            # Check in message content
+            if message.content and keyword.lower() in message.content.lower():
                 keyword_match = True
-                matched_content = message.content
                 
-            # Check keyword match in embeds if no content match
+            # Check in embeds if no match in content
             if not keyword_match and message.embeds:
                 for embed in message.embeds:
-                    # Check title
-                    if embed.title and re.search(rf"\b{re.escape(keyword)}\b", embed.title, re.IGNORECASE):
+                    # Check embed title
+                    if embed.title and keyword.lower() in embed.title.lower():
                         keyword_match = True
-                        matched_content = f"**{embed.title}**"
-                        if embed.description:
-                            matched_content += f"\n{embed.description}"
                         break
                         
-                    # Check description
-                    if embed.description and re.search(rf"\b{re.escape(keyword)}\b", embed.description, re.IGNORECASE):
+                    # Check embed description
+                    if embed.description and keyword.lower() in embed.description.lower():
                         keyword_match = True
-                        if embed.title:
-                            matched_content = f"**{embed.title}**\n{embed.description}"
-                        else:
-                            matched_content = embed.description
                         break
                         
-                    # Check fields
+                    # Check embed fields
                     for field in embed.fields:
-                        if (field.name and re.search(rf"\b{re.escape(keyword)}\b", field.name, re.IGNORECASE)) or \
-                           (field.value and re.search(rf"\b{re.escape(keyword)}\b", field.value, re.IGNORECASE)):
+                        if (field.name and keyword.lower() in field.name.lower()) or \
+                           (field.value and keyword.lower() in field.value.lower()):
                             keyword_match = True
-                            if embed.title:
-                                matched_content = f"**{embed.title}**\n"
-                            else:
-                                matched_content = ""
-                                
-                            if embed.description:
-                                matched_content += f"{embed.description}\n"
-                                
-                            matched_content += f"**{field.name}**: {field.value}"
                             break
                             
                     if keyword_match:
                         break
             
-            # If keyword matched, forward to target channel
-            if keyword_match:
-                target_channel_id = rule.get("target_channel")
-                target_channel = bot.get_channel(target_channel_id)
+            # Skip if no keyword match
+            if not keyword_match:
+                continue
                 
-                if target_channel:
-                    try:
-                        # Check if we've recently forwarded this keyword to this channel (throttling)
-                        target_id_str = str(target_channel_id)
-                        if target_id_str not in recent_forwards:
-                            recent_forwards[target_id_str] = {}
-                            
-                        if keyword in recent_forwards[target_id_str]:
-                            last_forwarded = recent_forwards[target_id_str][keyword]
-                            time_since_last = current_time - last_forwarded
-                            
-                            if time_since_last < THROTTLE_DURATION:
-                                # Skip this forward - still in throttle period
-                                logger.debug(f"Throttling forward for channel {target_id_str}, keyword '{keyword}' - last sent {time_since_last:.1f}s ago")
-                                continue
-                        
-                        # Mark this rule as processed for this message
-                        processed_messages[message_id_str]["rules"].append(rule_index)
-                        # Record time of this forward for throttling
-                        recent_forwards[target_id_str][keyword] = current_time
-                        
-                        # Create embed for forwarded message
-                        embed = discord.Embed(
-                            description=matched_content,
-                            timestamp=message.created_at,
-                            color=int(os.getenv('EMBED_COLOR', '000000'), 16)
-                        )
-                        
-                        # Add author info
-                        embed.set_author(
-                            name=message.author.display_name,
-                            icon_url=message.author.display_avatar.url
-                        )
-                        
-                        # Add source info
-                        embed.add_field(
-                            name="Source",
-                            value=f"<#{message.channel.id}>"
-                        )
-                        
-                        # Add matched keyword
-                        embed.add_field(
-                            name="Matched Keyword",
-                            value=f"`{keyword}`"
-                        )
-                        
-                        # Add jump link
-                        view = discord.ui.View()
-                        view.add_item(
-                            discord.ui.Button(
-                                style=discord.ButtonStyle.link,
-                                label="Jump to Message",
-                                url=message.jump_url
-                            )
-                        )
-                        
-                        # Prepare files (only for the first forward)
-                        files = []
-                        if processed_forwards == 0 and message.attachments:
-                            for attachment in message.attachments:
-                                try:
-                                    file_bytes = await attachment.read()
-                                    files.append(discord.File(
-                                        io.BytesIO(file_bytes),
-                                        filename=attachment.filename
-                                    ))
-                                except Exception as e:
-                                    logger.error(f"Failed to read attachment: {attachment.filename} - {str(e)}")
-                        
-                        # Forward embeds only on the first forward to avoid duplication
-                        if processed_forwards == 0 and message.embeds:
-                            for i, original_embed in enumerate(message.embeds):
-                                # Skip forwarding the embed if it's already included in our content
-                                if i == 0 and len(message.embeds) == 1 and keyword_match and not message.content:
-                                    continue
-                                    
-                                try:
-                                    # Copy the embed to send it
-                                    forwarded_embed = discord.Embed.from_dict(original_embed.to_dict())
-                                    await target_channel.send(embed=forwarded_embed)
-                                    # Add a small delay to avoid rate limits
-                                    await asyncio.sleep(0.25)
-                                except discord.HTTPException as e:
-                                    if e.status == 429:  # Rate limited
-                                        logger.warning(f"Rate limited when forwarding embed. Waiting and retrying...")
-                                        await asyncio.sleep(1.0)  # Wait longer on rate limit
-                                        try:
-                                            await target_channel.send(embed=forwarded_embed)
-                                        except:
-                                            logger.error(f"Failed to forward embed after rate limit wait")
-                                    else:
-                                        logger.error(f"HTTP error when forwarding embed: {str(e)}")
-                                except Exception as e:
-                                    logger.error(f"Error forwarding embed: {str(e)}")
-                        
-                        # Send the main forward message
-                        try:
-                            await target_channel.send(
-                                embed=embed,
-                                view=view,
-                                files=files if files else None
-                            )
-                            
-                            # Increment the processed counter
-                            processed_forwards += 1
-                            
-                            logger.info(f"Forwarded message {message.id} with keyword '{keyword}' to channel {target_channel.name}")
-                            logger.debug(f"Forward status: {processed_forwards}/{max_forwards_per_message} rules processed for message {message.id}")
-                            logger.debug(f"Throttling: Channel {target_id_str} with keyword '{keyword}' will be throttled for {THROTTLE_DURATION}s")
-                            
-                            
-                            # Add a delay to avoid rate limits
-                            await asyncio.sleep(0.5)
-                            
-                        except discord.HTTPException as e:
-                            if e.status == 429:  # Rate limited
-                                logger.warning(f"Rate limited when forwarding message. Waiting and retrying...")
-                                # Only retry once to avoid cascading rate limits
-                                retry_count = processed_messages[message_id_str].get("retry_count", 0)
-                                if retry_count < 2:
-                                    processed_messages[message_id_str]["retry_count"] = retry_count + 1
-                                    await asyncio.sleep(2.0)  # Wait longer on rate limit
-                                    try:
-                                        await target_channel.send(
-                                            embed=embed,
-                                            view=view,
-                                            files=files if files else None
-                                        )
-                                        processed_forwards += 1
-                                        logger.info(f"Successfully resent message after rate limit")
-                                    except Exception as retry_e:
-                                        logger.error(f"Failed to forward message after rate limit wait: {retry_e}")
-                                else:
-                                    logger.warning(f"Skipping retry - already reached retry limit for message {message.id}")
-                            else:
-                                logger.error(f"HTTP error when forwarding message: {str(e)}")
-                    except Exception as e:
-                        logger.error(f"Error forwarding message: {str(e)}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                    
+            # Get target channel
+            target_channel_id = rule.get("target_channel")
+            if not target_channel_id:
+                continue
+                
+            target_channel = bot.get_channel(target_channel_id)
+            if not target_channel:
+                logger.warning(f"Target channel {target_channel_id} not found for rule {rule_index}")
+                continue
+                
+            # Create forward embed
+            embed = discord.Embed(
+                title="Forwarded Message",
+                description=message.content if message.content else "No content",
+                color=int(os.getenv('EMBED_COLOR', '000000'), 16)
+            )
+            
+            # Add message link
+            embed.add_field(
+                name="Source",
+                value=f"[Jump to Message]({message.jump_url})",
+                inline=False
+            )
+            
+            # Add author info if available
+            if message.author:
+                embed.set_author(
+                    name=message.author.display_name,
+                    icon_url=message.author.display_avatar.url if message.author.display_avatar else None
+                )
+                
+            # Add channel info
+            embed.add_field(
+                name="Channel",
+                value=f"<#{message.channel.id}>",
+                inline=True
+            )
+            
+            # Add matched keyword
+            embed.add_field(
+                name="Matched Keyword",
+                value=f"`{keyword}`",
+                inline=True
+            )
+            
+            # Forward the message
+            try:
+                await target_channel.send(embed=embed)
+                processed_forwards += 1
+                processed_messages[message_id_str]["forwards"] = processed_forwards
+                processed_messages[message_id_str]["rules"].add(rule_index)
+                logger.info(f"Forwarded message {message.id} to channel {target_channel.name} (rule {rule_index})")
+            except Exception as e:
+                logger.error(f"Error forwarding message {message.id} to channel {target_channel.name}: {e}")
+                
     except Exception as e:
-        logger.error(f"Error processing forwarding rules: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc()) 
+        logger.error(f"Error processing forwarding rules: {e}")
+        
+    finally:
+        # Clean up old messages periodically
+        if random.random() < 0.1:  # 10% chance to clean on each message
+            clean_processed_messages() 
