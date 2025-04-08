@@ -17,5 +17,20 @@
     }
   },
   "notification_channel_id": null,
-  "forwarding_rules": []
+  "forwarding_rules": [
+    {
+      "type": "category",
+      "keywords": [
+        "pouch",
+        "sacchetto",
+        "rivali predestinati",
+        "team rocket",
+        "destined rivals"
+      ],
+      "category_id": 1337344358575378454,
+      "blacklist_ids": [],
+      "blacklist_room_ids": [],
+      "target_channel": 1351470303020191756
+    }
+  ]
 }

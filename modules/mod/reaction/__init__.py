@@ -34,7 +34,7 @@ def load_config():
 
 def get_whitelisted_categories():
     """Get whitelisted category IDs from environment."""
-    category_ids_str = os.getenv("REACTION_WHITELISTED_CATEGORIES", "")
+    category_ids_str = os.getenv("REACTION_FORWARD_CATEGORY_IDS", "")
     logger.info(f"Reading whitelisted categories from env: {category_ids_str}")
     if not category_ids_str:
         return []

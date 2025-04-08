@@ -1,23 +1,13 @@
 {
-    "ENABLED": false,
+    "ENABLED": true,
     "LINK_EMOJI": "\ud83d\udd17",
+    "CATEGORY_IDS": [1337344358575378454],
+    "BLACKLIST_CHANNEL_IDS": [],
     "STORES": {
         "luisaviaroma": {
             "enabled": true,
             "emoji": "\ud83d\udc55",
-            "category_ids": [],
-            "blacklist_channel_ids": []
-        },
-        "ssense": {
-            "enabled": true,
-            "emoji": "\ud83d\udc54",
-            "category_ids": [],
-            "blacklist_channel_ids": []
-        },
-        "farfetch": {
-            "enabled": true,
-            "emoji": "\ud83d\udc57",
-            "category_ids": [],
+            "category_ids": [542376694007463957],
             "blacklist_channel_ids": []
         }
     },

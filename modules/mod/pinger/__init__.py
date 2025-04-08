@@ -1066,48 +1066,59 @@ async def setup(bot):
     @require_mod_role()
     async def forward_list(interaction: discord.Interaction):
         """List all forwarding rules."""
-        if not PINGER_CONFIG["forwarding_rules"]:
-            await interaction.response.send_message(
-                "No forwarding rules configured.",
+        try:
+            # Defer the response immediately to prevent timeout
+            await interaction.response.defer(ephemeral=True)
+            
+            if not PINGER_CONFIG["forwarding_rules"]:
+                await interaction.followup.send(
+                    "No forwarding rules configured.",
+                    ephemeral=True
+                )
+                return
+                
+            # Create embed for rules
+            embed = discord.Embed(
+                title="Keyword Forwarding Rules",
+                color=int(os.getenv('EMBED_COLOR', '000000'), 16)
+            )
+            
+            # Add channel rules
+            channel_rules = [r for r in PINGER_CONFIG["forwarding_rules"] if r.get("type") == "channels"]
+            if channel_rules:
+                for i, rule in enumerate(channel_rules):
+                    channels = [f"<#{c_id}>" for c_id in rule.get("channel_ids", [])]
+                    target = f"<#{rule.get('target_channel')}>"
+                    embed.add_field(
+                        name=f"Channel Rule #{i+1}",
+                        value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nChannels: {', '.join(channels)}\nTarget: {target}",
+                        inline=False
+                    )
+            
+            # Add category rules
+            category_rules = [r for r in PINGER_CONFIG["forwarding_rules"] if r.get("type") == "category"]
+            if category_rules:
+                for i, rule in enumerate(category_rules):
+                    category = f"<#{rule.get('category_id')}>"
+                    target = f"<#{rule.get('target_channel')}>"
+                    blacklist = ""
+                    if rule.get("blacklist_ids"):
+                        blacklist_mentions = [f"<#{c_id}>" for c_id in rule.get("blacklist_ids")]
+                        blacklist = f"\nExcluded: {', '.join(blacklist_mentions)}"
+                    embed.add_field(
+                        name=f"Category Rule #{i+1}",
+                        value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nCategory: {category}{blacklist}\nTarget: {target}",
+                        inline=False
+                    )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in forward_list command: {e}")
+            # Use followup since we already deferred
+            await interaction.followup.send(
+                f"An error occurred while listing forwarding rules: {str(e)}",
                 ephemeral=True
             )
-            return
-            
-        # Create embed for rules
-        embed = discord.Embed(
-            title="Keyword Forwarding Rules",
-            color=int(os.getenv('EMBED_COLOR', '000000'), 16)
-        )
-        
-        # Add channel rules
-        channel_rules = [r for r in PINGER_CONFIG["forwarding_rules"] if r.get("type") == "channels"]
-        if channel_rules:
-            for i, rule in enumerate(channel_rules):
-                channels = [f"<#{c_id}>" for c_id in rule.get("channel_ids", [])]
-                target = f"<#{rule.get('target_channel')}>"
-                embed.add_field(
-                    name=f"Channel Rule #{i+1}",
-                    value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nChannels: {', '.join(channels)}\nTarget: {target}",
-                    inline=False
-                )
-        
-        # Add category rules
-        category_rules = [r for r in PINGER_CONFIG["forwarding_rules"] if r.get("type") == "category"]
-        if category_rules:
-            for i, rule in enumerate(category_rules):
-                category = f"<#{rule.get('category_id')}>"
-                target = f"<#{rule.get('target_channel')}>"
-                blacklist = ""
-                if rule.get("blacklist_ids"):
-                    blacklist_mentions = [f"<#{c_id}>" for c_id in rule.get("blacklist_ids")]
-                    blacklist = f"\nExcluded: {', '.join(blacklist_mentions)}"
-                embed.add_field(
-                    name=f"Category Rule #{i+1}",
-                    value=f"Keywords: {', '.join(f"`{k}`" for k in rule.get('keywords', []))}\nCategory: {category}{blacklist}\nTarget: {target}",
-                    inline=False
-                )
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
     
     @forward_group.command(name="remove")
     @app_commands.describe(
@@ -1427,21 +1438,16 @@ async def teardown(bot):
 async def process_forwarding_rules(bot, message):
     """Process forwarding rules for a message."""
     try:
-        # Skip if no rules configured
-        if not PINGER_CONFIG.get("forwarding_rules"):
-            return
-            
-        # Get message ID for tracking
+        # Initialize message tracking if not exists
         message_id_str = str(message.id)
-        
-        # Initialize tracking for this message if not already done
         if message_id_str not in processed_messages:
             processed_messages[message_id_str] = {
-                "timestamp": time.time(),
+                "forwards": 0,
+                "users": [],
                 "rules": set(),
-                "forwards": 0
+                "timestamp": time.time()
             }
-            
+        
         # Track number of forwards for this message
         processed_forwards = processed_messages[message_id_str].get("forwards", 0)
         max_forwards_per_message = 5  # Limit to prevent spam
@@ -1480,20 +1486,27 @@ async def process_forwarding_rules(bot, message):
                 blacklist_ids = rule.get("blacklist_ids", [])
                 blacklist_room_ids = rule.get("blacklist_room_ids", [])
                 
+                logger.debug(f"Checking category rule: category_id={category_id}, message_category={message.channel.category.id if message.channel.category else None}")
+                logger.debug(f"Blacklist check: channel_id={message.channel.id} not in {blacklist_ids} and not in {blacklist_room_ids}")
+                
                 if (message.channel.category and 
                     message.channel.category.id == category_id and 
                     message.channel.id not in blacklist_ids and
                     message.channel.id not in blacklist_room_ids):
                     in_scope = True
+                    logger.debug(f"Message is in scope for category rule")
             
             # Skip if not in scope
             if not in_scope:
+                logger.debug(f"Message not in scope for rule {rule_index}")
                 continue
                 
             # Check keyword match in message content and embeds
             keyword_match = False
             matched_keyword = None
             matched_content = None
+            
+            logger.debug(f"Checking keywords {keywords} in message content and embeds")
             
             # Check in message content
             if message.content:
@@ -1502,13 +1515,16 @@ async def process_forwarding_rules(bot, message):
                         keyword_match = True
                         matched_keyword = keyword
                         matched_content = message.content
+                        logger.debug(f"Found keyword '{keyword}' in message content")
                         break
                 
             # Check in embeds if no match in content
             if not keyword_match and message.embeds:
+                logger.debug(f"Checking {len(message.embeds)} embeds for keywords")
                 for embed in message.embeds:
                     # Check embed title
                     if embed.title:
+                        logger.debug(f"Checking embed title: {embed.title}")
                         for keyword in keywords:
                             if keyword.lower() in embed.title.lower():
                                 keyword_match = True
@@ -1516,6 +1532,7 @@ async def process_forwarding_rules(bot, message):
                                 matched_content = f"**{embed.title}**"
                                 if embed.description:
                                     matched_content += f"\n{embed.description}"
+                                logger.debug(f"Found keyword '{keyword}' in embed title")
                                 break
                         if keyword_match:
                             break
